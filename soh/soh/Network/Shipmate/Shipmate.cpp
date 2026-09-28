@@ -1,5 +1,11 @@
 // Keep HTTP and its platform socket headers out of the game-facing header.
 #include <httplib.h>
+#ifdef _WIN32
+#include <iphlpapi.h>
+#else
+#include <ifaddrs.h>
+#include <net/if.h>
+#endif
 #include "Shipmate.h"
 #include "ShipmateWeb.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -24,6 +30,63 @@ namespace {
 std::unique_ptr<httplib::Server> server;
 std::thread listener;
 std::string error;
+std::string lanUrl;
+
+// Best effort only: use the first active private IPv4 address.
+std::string FindLanAddress() {
+    auto privateAddress = [](const sockaddr* address) -> std::string {
+        if (!address || address->sa_family != AF_INET) {
+            return {};
+        }
+        const auto& ipv4 = reinterpret_cast<const sockaddr_in*>(address)->sin_addr;
+        const uint32_t ip = ntohl(ipv4.s_addr);
+        if ((ip >> 24) != 10 && (ip >> 20) != 0xAC1 && (ip >> 16) != 0xC0A8) {
+            return {};
+        }
+        char text[INET_ADDRSTRLEN]{};
+        return inet_ntop(AF_INET, &ipv4, text, sizeof(text)) ? text : "";
+    };
+#ifdef _WIN32
+    ULONG size = 0;
+    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    if (GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &size) != ERROR_BUFFER_OVERFLOW) {
+        return {};
+    }
+    std::vector<unsigned char> buffer(size);
+    auto* adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
+    if (GetAdaptersAddresses(AF_INET, flags, nullptr, adapters, &size) != NO_ERROR) {
+        return {};
+    }
+    for (auto* adapter = adapters; adapter; adapter = adapter->Next) {
+        if (adapter->OperStatus != IfOperStatusUp) {
+            continue;
+        }
+        for (auto* entry = adapter->FirstUnicastAddress; entry; entry = entry->Next) {
+            auto address = privateAddress(entry->Address.lpSockaddr);
+            if (!address.empty()) {
+                return address;
+            }
+        }
+    }
+#else
+    ifaddrs* interfaces = nullptr;
+    if (getifaddrs(&interfaces) != 0) {
+        return {};
+    }
+    std::string address;
+    for (auto* entry = interfaces; entry; entry = entry->ifa_next) {
+        if ((entry->ifa_flags & IFF_UP) && !(entry->ifa_flags & IFF_LOOPBACK)) {
+            address = privateAddress(entry->ifa_addr);
+            if (!address.empty()) {
+                break;
+            }
+        }
+    }
+    freeifaddrs(interfaces);
+    return address;
+#endif
+    return {};
+}
 struct Job {
     std::function<void()> run;
     std::function<void()> cancel;
@@ -122,7 +185,12 @@ const std::string& Error() {
     return error;
 }
 
+const std::string& LanUrl() {
+    return lanUrl;
+}
+
 void Disable() {
+    lanUrl.clear();
     std::deque<std::shared_ptr<Job>> cancelled;
     {
         std::lock_guard lock(jobsMutex);
@@ -269,6 +337,12 @@ bool Enable(bool lan, int port) {
     if (!next->bind_to_port(lan ? "0.0.0.0" : "127.0.0.1", port)) {
         error = "Cannot open port " + std::to_string(port) + ". Try a different port.";
         return false;
+    }
+    if (lan) {
+        auto address = FindLanAddress();
+        if (!address.empty()) {
+            lanUrl = "http://" + address + ":" + std::to_string(port) + "/";
+        }
     }
     server = std::move(next);
     {

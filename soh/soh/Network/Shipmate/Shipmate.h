@@ -15,6 +15,7 @@ bool Enable(bool lan, int port);
 void Disable();
 bool IsEnabled();
 const std::string& Error();
+const std::string& LanUrl();
 // Game-thread request handling and cosmetic reads.
 nlohmann::json HandleRequest(const nlohmann::json& request);
 nlohmann::json HudColors();

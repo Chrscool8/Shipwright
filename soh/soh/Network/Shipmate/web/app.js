@@ -245,10 +245,20 @@ try {
 } catch {
     setView('items');
 }
+async function requestJson(url, options = {}) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        return await response.json();
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 async function refresh() {
     try {
-        const response = await fetch('/state');
-        const data = await response.json();
+        const data = await requestJson('/state');
         const next = data.state ?? null;
         el('status').textContent = next?.loaded ? (next.canChange ? '' : 'Link is busy') : data.message ?? 'Load a save in Ship.';
         if (next && state?.assetRevision !== next.assetRevision) {
@@ -279,22 +289,24 @@ async function change(payload) {
     render();
     el('message').textContent = '';
     try {
-        const response = await fetch('/action', {
+        const data = await requestJson('/action', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ ...payload, schemaVersion: 2 })
         });
-        const data = await response.json();
         el('message').textContent = data.status === 'success' ? '' : data.message ?? data.status;
         if (data.status === 'success') selected = selectedButton = null;
     } catch {
         el('message').textContent = 'Connection lost. Check Ship before retrying.';
     }
-    await refresh();
-    busy = false;
-    render();
+    try {
+        await refresh();
+    } finally {
+        busy = false;
+        render();
+    }
 }
 async function poll() {
     if (!busy) await refresh();

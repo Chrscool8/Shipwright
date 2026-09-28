@@ -8,6 +8,8 @@
 #include <soh/Network/Sail/Sail.h>
 #ifdef ENABLE_SHIPMATE
 #include <soh/Network/Shipmate/Shipmate.h>
+#include <qrcodegen.h>
+#include <algorithm>
 #endif
 #include <soh/Network/CrowdControl/CrowdControl.h>
 #include "soh/SohGui/UIWidgets.hpp"
@@ -53,7 +55,7 @@ void SohMenu::AddMenuNetwork() {
     AddWidget(path, "Allow LAN access", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_REMOTE("Shipmate.LAN"))
         .Options(CheckboxOptions().Tooltip(
-            "Let devices on your network open Shipmate at this PC's IP and configured port. No password."))
+            "Let devices on your network open Shipmate at this PC's IP and configured port."))
         .Callback([](WidgetInfo&) {
             if (Shipmate::IsEnabled() &&
                 !Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
@@ -61,7 +63,52 @@ void SohMenu::AddMenuNetwork() {
                 CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
             }
         });
-    AddWidget(path, "Open Shipmate", WIDGET_BUTTON)
+    AddWidget(path, "Connect phone##Shipmate", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {
+        if (!Shipmate::IsEnabled() || !CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0)) {
+            return;
+        }
+        const auto& url = Shipmate::LanUrl();
+        if (url.empty()) {
+            ImGui::TextWrapped("No LAN address found. On your phone, open http://<PC-LAN-IP>:%d/.",
+                               CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort));
+            return;
+        }
+        static std::string previousUrl;
+        static uint8_t qr[qrcodegen_BUFFER_LEN_FOR_VERSION(4)]{};
+        static bool valid = false;
+        if (previousUrl != url) {
+            uint8_t scratch[sizeof(qr)];
+            valid = qrcodegen_encodeText(url.c_str(), scratch, qr, qrcodegen_Ecc_MEDIUM, 1, 4,
+                                        qrcodegen_Mask_AUTO, true);
+            previousUrl = url;
+        }
+        ImGui::TextUnformatted("Scan with your phone on the same Wi-Fi.");
+        if (valid) {
+            const int modules = qrcodegen_getSize(qr);
+            // Integer-sized squares and a four-module white border keep the code sharp.
+            const int scale = std::max(1, int(ImGui::GetFontSize() * 12 / (modules + 8)));
+            const float size = float((modules + 8) * scale);
+            auto origin = ImGui::GetCursorScreenPos();
+            origin.x = float(int(origin.x));
+            origin.y = float(int(origin.y));
+            auto* draw = ImGui::GetWindowDrawList();
+            draw->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32_WHITE);
+            for (int y = 0; y < modules; ++y) {
+                for (int x = 0; x < modules; ++x) {
+                    if (qrcodegen_getModule(qr, x, y)) {
+                        const ImVec2 corner(origin.x + (x + 4) * scale, origin.y + (y + 4) * scale);
+                        draw->AddRectFilled(corner, ImVec2(corner.x + scale, corner.y + scale), IM_COL32_BLACK);
+                    }
+                }
+            }
+            ImGui::Dummy(ImVec2(size, size));
+        }
+        ImGui::TextUnformatted(url.c_str());
+        if (ImGui::Button("Copy URL##ShipmateLAN")) {
+            ImGui::SetClipboardText(url.c_str());
+        }
+    });
+    AddWidget(path, "Open in Browser", WIDGET_BUTTON)
         .PreFunc([](WidgetInfo& info) { info.options->disabled = !Shipmate::IsEnabled(); })
         .Callback([](WidgetInfo&) {
             auto url = "http://127.0.0.1:" +

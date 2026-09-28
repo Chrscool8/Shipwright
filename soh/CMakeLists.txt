@@ -821,6 +821,21 @@ if(SHIPMATE_SUPPORTED)
             "${SHIPMATE_DEPS}/httplib.h"
             EXPECTED_HASH SHA256=4770f8ea3d3fcd27b0b713c783d9b53bce3baddbd5adad13714011df96142526)
     endif()
+    # Nayuki QR Code generator 1.8.0 (MIT); generated locally for the LAN menu.
+    if(NOT EXISTS "${SHIPMATE_DEPS}/qrcodegen.c")
+        file(DOWNLOAD "https://raw.githubusercontent.com/nayuki/QR-Code-generator/v1.8.0/c/qrcodegen.c"
+            "${SHIPMATE_DEPS}/qrcodegen.c"
+            EXPECTED_HASH SHA256=300eff07ee25baaa7578f20284411638154716379437391e7e689c0e6ce81403)
+    endif()
+    if(NOT EXISTS "${SHIPMATE_DEPS}/qrcodegen.h")
+        file(DOWNLOAD "https://raw.githubusercontent.com/nayuki/QR-Code-generator/v1.8.0/c/qrcodegen.h"
+            "${SHIPMATE_DEPS}/qrcodegen.h"
+            EXPECTED_HASH SHA256=e82df4bff37d18b5863b9e7486fe6bda1b6cda8c3b9ecebfec473907265cb589)
+    endif()
+    target_sources(soh PRIVATE "${SHIPMATE_DEPS}/qrcodegen.c")
+    if(WIN32)
+        target_link_libraries(soh PRIVATE iphlpapi)
+    endif()
     target_include_directories(soh SYSTEM PRIVATE "${SHIPMATE_DEPS}")
     target_include_directories(soh PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(soh PRIVATE ZLIB::ZLIB)
