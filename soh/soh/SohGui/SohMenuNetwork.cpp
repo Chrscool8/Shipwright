@@ -30,7 +30,7 @@ void SohMenu::AddMenuNetwork() {
         .Callback([](WidgetInfo&) {
             if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0)) {
                 if (!Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
-                                      CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385))) {
+                                      CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort))) {
                     CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
                 }
             } else {
@@ -44,8 +44,8 @@ void SohMenu::AddMenuNetwork() {
         CVarInputInt("##PortShipmate", CVAR_REMOTE("Shipmate.Port"),
                      InputOptions()
                          .Color(THEME_COLOR)
-                         .PlaceholderText("43385")
-                         .DefaultValue("43385")
+                         .PlaceholderText(std::to_string(Shipmate::DefaultPort))
+                         .DefaultValue(std::to_string(Shipmate::DefaultPort))
                          .Size(ImVec2(ImGui::GetFontSize() * 5, 0))
                          .LabelPosition(LabelPositions::None));
         ImGui::EndDisabled();
@@ -55,19 +55,23 @@ void SohMenu::AddMenuNetwork() {
         .Options(CheckboxOptions().Tooltip(
             "Let devices on your network open Shipmate at this PC's IP and configured port. No password."))
         .Callback([](WidgetInfo&) {
-            if (Shipmate::IsEnabled() && !Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
-                                                           CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385))) {
+            if (Shipmate::IsEnabled() &&
+                !Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
+                                  CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort))) {
                 CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
             }
         });
     AddWidget(path, "Open Shipmate", WIDGET_BUTTON)
         .PreFunc([](WidgetInfo& info) { info.options->disabled = !Shipmate::IsEnabled(); })
         .Callback([](WidgetInfo&) {
-            auto url = "http://127.0.0.1:" + std::to_string(CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385)) + "/";
+            auto url = "http://127.0.0.1:" +
+                       std::to_string(CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort)) + "/";
             SDL_OpenURL(url.c_str());
         });
     AddWidget(path, "Shipmate URL", WIDGET_TEXT).PreFunc([](WidgetInfo& info) {
-        info.name = "http://127.0.0.1:" + std::to_string(CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385)) + "/";
+        info.name =
+            "http://127.0.0.1:" + std::to_string(CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort)) +
+            "/";
     });
     AddWidget(path, "##ShipmateError", WIDGET_TEXT).PreFunc([](WidgetInfo& info) {
         info.isHidden = Shipmate::Error().empty();

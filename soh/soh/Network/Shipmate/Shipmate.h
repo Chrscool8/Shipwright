@@ -10,6 +10,7 @@ class ResourceManager;
 }
 
 namespace Shipmate {
+inline constexpr int DefaultPort = 43385;
 bool Enable(bool lan, int port);
 void Disable();
 bool IsEnabled();
@@ -17,18 +18,20 @@ const std::string& Error();
 // Game-thread request handling and cosmetic reads.
 nlohmann::json HandleRequest(const nlohmann::json& request);
 nlohmann::json HudColors();
+std::string ItemIconPath(int item);
 
 // Atomic revision reads are also safe on HTTP workers; invalidation runs on the game thread.
 uint64_t AssetRevision();
 void InvalidateAssets();
 
-// Capture only the manager lifetime and asset selection on the game thread.
+// Capture the manager lifetime, asset selection, and requested item path on the game thread.
 struct AssetContext {
     std::shared_ptr<Ship::ResourceManager> manager;
     bool alternate;
     uint64_t revision;
+    std::string itemIconPath;
 };
-AssetContext CaptureAssets();
+AssetContext CaptureAssets(const std::string& name);
 
 // Resource waits, pixel conversion/compositing and encoding belong to HTTP workers.
 struct Image {

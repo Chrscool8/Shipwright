@@ -47,9 +47,7 @@ template <typename F> auto OnGameThread(F fn) -> decltype(fn()) {
     job->run = [promise, fn] {
         try {
             promise->set_value(fn());
-        } catch (...) {
-            promise->set_exception(std::current_exception());
-        }
+        } catch (...) { promise->set_exception(std::current_exception()); }
     };
     job->cancel = [promise] {
         promise->set_exception(std::make_exception_ptr(std::runtime_error("Shipmate was disabled")));
@@ -197,9 +195,7 @@ bool Enable(bool lan, int port) {
             if (exception) {
                 std::rethrow_exception(exception);
             }
-        } catch (const std::exception& e) {
-            message = e.what();
-        } catch (...) {
+        } catch (const std::exception& e) { message = e.what(); } catch (...) {
         }
         response.status = 503;
         Json(response, { { "status", "failure" }, { "message", message } });
@@ -244,7 +240,7 @@ bool Enable(bool lan, int port) {
                 }
             }
         }
-        auto context = OnGameThread([] { return CaptureAssets(); });
+        auto context = OnGameThread([name] { return CaptureAssets(name); });
         revision = context.revision;
         {
             std::lock_guard lock(imagesMutex);
@@ -289,7 +285,8 @@ bool Enable(bool lan, int port) {
 
 static RegisterShipInitFunc init([] {
     if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0) &&
-        !Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0), CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385))) {
+        !Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
+                CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), DefaultPort))) {
         CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
     }
 });

@@ -1,14 +1,4 @@
-const names = ['Deku stick', 'Deku nut', 'Bomb', 'Bow', 'Fire arrows', "Din’s Fire", 'Slingshot', 'Fairy Ocarina', 'Ocarina of Time', 'Bombchu', 'Hookshot', 'Longshot', 'Ice arrows', "Farore’s Wind", 'Boomerang', 'Lens of Truth', 'Magic bean', 'Hammer', 'Light arrows', "Nayru’s Love", 'Empty bottle', 'Red potion', 'Green potion', 'Blue potion', 'Fairy', 'Fish', 'Milk', "Ruto’s letter", 'Blue fire', 'Bugs', 'Big Poe', 'Half milk', 'Poe', 'Weird egg', 'Cucco', "Zelda’s letter", 'Keaton Mask', 'Skull Mask', 'Spooky Mask', 'Bunny Hood', 'Goron Mask', 'Zora Mask', 'Gerudo Mask', 'Mask of Truth', 'Sold out', 'Pocket egg', 'Pocket Cucco', 'Cojiro', 'Odd mushroom', 'Odd potion', "Poacher’s saw", 'Broken Goron sword', 'Prescription', 'Eyeball frog', 'Eye drops', 'Claim check', 'Bow + fire arrows', 'Bow + ice arrows', 'Bow + light arrows', 'Kokiri Sword', 'Master Sword', 'Biggoron Sword', 'Deku Shield', 'Hylian Shield', 'Mirror Shield', 'Kokiri Tunic', 'Goron Tunic', 'Zora Tunic', 'Kokiri Boots', 'Iron Boots', 'Hover Boots'];
 const labels = ['C-left', 'C-down', 'C-right', 'D-pad up', 'D-pad down', 'D-pad left', 'D-pad right'];
-const bootsNames = ['Kokiri Boots', 'Iron Boots', 'Hover Boots'];
-const gearNames = [
-    ['None', 'Kokiri Sword', 'Master Sword', 'Biggoron Sword'],
-    ['None', 'Deku Shield', 'Hylian Shield', 'Mirror Shield'],
-    ['None', 'Kokiri Tunic', 'Goron Tunic', 'Zora Tunic'],
-    ['None', ...bootsNames]
-];
-const name = item => item === 255 ? 'Empty' : item === 85 ? 'Broken Giant’s Knife' :
-    item === 61 ? (state?.biggoronSword ? 'Biggoron Sword' : 'Giant’s Knife') : (names[item] ?? `Item ${item}`);
 const el = id => document.getElementById(id);
 let state = null,
     selected = null,
@@ -53,8 +43,8 @@ function chooseButton(index) {
     } else {
         selectedButton = selectedButton?.button === index ? null : {
             button: index,
-            item: state.buttonItems[index + 1],
-            slot: state.buttonSlots[index],
+            item: state.buttons[index + 1].item,
+            slot: state.buttons[index + 1].slot,
             fileNum: state.fileNum,
             age: state.age
         };
@@ -62,9 +52,9 @@ function chooseButton(index) {
     }
 }
 
-function icon(item, asset) {
+function icon(asset) {
     const img = document.createElement('img');
-    img.src = `/assets/${asset ?? `item-${item}`}.png?v=${state?.assetRevision ?? 0}`;
+    img.src = `/assets/${asset}.png?v=${state?.assetRevision ?? 0}`;
     img.alt = '';
     img.className = 'icon';
     img.draggable = false;
@@ -76,7 +66,7 @@ function icon(item, asset) {
 }
 
 function tint(asset, channel) {
-    const img = icon(null, asset);
+    const img = icon(asset);
     img.style.filter = `url(#tint-${channel})`;
     return img;
 }
@@ -88,20 +78,21 @@ function updateColors(colors) {
     }
 }
 
-function decorateSlot(b, item, x, y, caption, equipped = false, asset) {
+function decorateSlot(b, entry, x, y) {
     b.className = 'slot';
+    const caption = entry.name;
     b.title = caption;
     b.setAttribute('aria-label', caption);
     b.style.left = `${x / 240 * 100}%`;
     b.style.top = `${y / 160 * 100}%`;
-    if (equipped) {
-        const outline = icon(null, 'gEquippedItemOutlineTex');
+    if (entry.equipped) {
+        const outline = icon('gEquippedItemOutlineTex');
         outline.className = 'equipped';
         b.append(outline);
     }
-    b.append(icon(item, asset));
+    if (entry.asset) b.append(icon(entry.asset));
     for (const corner of ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight']) {
-        const cursor = icon(null, `gPauseMenuCursor${corner}Tex`);
+        const cursor = icon(`gPauseMenuCursor${corner}Tex`);
         cursor.className = `cursor ${corner}`;
         b.append(cursor);
     }
@@ -111,6 +102,15 @@ function showCaption(b, id, text) {
     b.onmouseenter = b.onfocus = () => {
         el(id).textContent = text;
     };
+}
+
+function appendAmmo(element, entry, className) {
+    if (entry.ammo === null) return;
+    const ammo = document.createElement('span');
+    ammo.className = className;
+    for (const digit of String(entry.ammo)) ammo.append(icon(`gAmmoDigit${digit}Tex`));
+    element.append(ammo);
+    element.setAttribute('aria-label', `${element.title}, ${entry.ammo}`);
 }
 
 function render() {
@@ -123,13 +123,14 @@ function render() {
         el('selection').textContent = 'Load a save in Ship.';
         return;
     }
-    if (selected && (selected.fileNum !== state.fileNum || selected.age !== state.age || state.items[selected.slot] !== selected.item)) selected = null;
+    if (selected && (selected.fileNum !== state.fileNum || selected.age !== state.age ||
+            state.items[selected.slot]?.item !== selected.item)) selected = null;
+    const selectedEntry = selectedButton ? state.buttons[selectedButton.button + 1] : null;
     if (selectedButton && (selectedButton.fileNum !== state.fileNum || selectedButton.age !== state.age ||
-            state.buttonItems[selectedButton.button + 1] !== selectedButton.item ||
-            state.buttonSlots[selectedButton.button] !== selectedButton.slot ||
-            (selectedButton.button >= 3 && !state.dpadEnabled))) selectedButton = null;
+            !selectedEntry?.allowed || selectedEntry.item !== selectedButton.item ||
+            selectedEntry.slot !== selectedButton.slot)) selectedButton = null;
     const enabled = state.canChange && !busy;
-    el('selection').textContent = selected ? `Selected: ${name(selected.item)}. Choose a button above.` : selectedButton ? `Selected: ${labels[selectedButton.button]}. Choose an item or Unassign. Click again to cancel.` : 'Select an item and a button, in either order.';
+    el('selection').textContent = selected ? `Selected: ${state.items[selected.slot].name}. Choose a button above.` : selectedButton ? `Selected: ${labels[selectedButton.button]}. Choose an item or Unassign. Click again to cancel.` : 'Select an item and a button, in either order.';
     const cButtons = document.createElement('div');
     cButtons.className = 'hud-c-buttons';
     const dpad = document.createElement('div');
@@ -139,44 +140,28 @@ function render() {
     dpad.append(cross);
     el('buttons').append(cButtons, dpad);
     const positions = ['left', 'down', 'right', 'up', 'down', 'left', 'right'];
-    for (let i = -1; i < labels.length; ++i) {
-        const item = state.buttonItems[i + 1],
-            label = i < 0 ? 'B' : labels[i];
-        const b = i < 0 ? document.createElement('div') : button('', !enabled || (selected && !state.assignable[selected.slot]) || (i >= 3 && !state.dpadEnabled), () => chooseButton(i));
+    for (const entry of state.buttons) {
+        const i = entry.button;
+        const label = i < 0 ? 'B' : labels[i];
+        const b = i < 0 ? document.createElement('div') : button('', !enabled || !entry.allowed ||
+            (selected && !state.items[selected.slot].allowed), () => chooseButton(i));
         b.className = `assignment ${i < 0 ? 'hud-b readonly' : i < 3 ? `hud-c ${positions[i]}` : `hud-direction ${positions[i]}`}`;
-        b.title = `${label}: ${name(item)}`;
+        b.title = `${label}: ${entry.name}`;
         b.setAttribute('aria-label', b.title);
         if (i >= 0) b.setAttribute('aria-pressed', String(selectedButton?.button === i));
         else b.setAttribute('role', 'img');
         if (i < 3) {
-            const background = tint('hud-button', i < 0 ? 'b' : ['left', 'down', 'right'][i]);
+            const background = tint('hud-button', i < 0 ? 'b' : positions[i]);
             background.className = 'button-background';
             b.append(background);
         }
-        if (item !== 255) {
-            const image = icon(item);
-            image.className = 'assigned-icon';
-            b.append(image);
-            const ammoSlot = ({
-                0: 0,
-                1: 1,
-                2: 2,
-                3: 3,
-                6: 6,
-                9: 8,
-                16: 14,
-                56: 3,
-                57: 3,
-                58: 3
-            })[item];
-            if (ammoSlot !== undefined) {
-                const count = Math.max(0, state.ammo[ammoSlot]);
-                const ammo = document.createElement('span');
-                ammo.className = 'hud-ammo';
-                for (const digit of String(count)) ammo.append(icon(null, `gAmmoDigit${digit}Tex`));
-                b.append(ammo);
-                b.setAttribute('aria-label', `${b.title}, ${count}`);
+        if (!entry.empty) {
+            if (entry.asset) {
+                const image = icon(entry.asset);
+                image.className = 'assigned-icon';
+                b.append(image);
             }
+            appendAmmo(b, entry, 'hud-ammo');
         } else if (i >= 0 && i < 3) {
             const arrow = tint(`hud-c-${positions[i]}`, positions[i]);
             arrow.className = 'empty-c-arrow';
@@ -187,93 +172,54 @@ function render() {
     if (selectedButton) {
         el('unassign').hidden = false;
         el('unassign').textContent = `Unassign ${labels[selectedButton.button]}`;
-        el('unassign').disabled = !enabled || selectedButton.item === 255;
-        el('unassign').onclick = () => change({
-            action: 'unassign',
-            ...selectedButton
-        });
+        el('unassign').disabled = !enabled || selectedEntry.empty;
+        el('unassign').onclick = () => change({ action: 'unassign', ...selectedButton });
     }
     // Original pause geometry: 28px icons, 32px spacing, six columns by four rows.
-    state.items.forEach((item, slot) => {
-        if (item === 255) return; // Position derives from slot, so empty slots never collapse the grid.
-        const bottle = slot >= 18 && slot <= 21 ? ` (bottle ${slot - 17})` : '';
-        const title = name(item) + bottle;
-        const b = button('', !state.assignable[slot] || !enabled, () => chooseItem(slot, item));
-        decorateSlot(b, item, 26 + (slot % 6) * 32, 24 + Math.floor(slot / 6) * 32, title, state.buttonSlots.includes(slot));
-        b.classList.toggle('restricted', !state.assignable[slot]);
+    for (const entry of state.items) {
+        if (entry.empty) continue;
+        const slot = entry.slot;
+        const b = button('', !entry.allowed || !enabled, () => chooseItem(slot, entry.item));
+        decorateSlot(b, entry, 26 + (slot % 6) * 32, 24 + Math.floor(slot / 6) * 32);
+        b.classList.toggle('restricted', !entry.allowed);
         b.setAttribute('aria-pressed', String(selected?.slot === slot));
-        showCaption(b, 'item-name', title);
-        if ([0, 1, 2, 3, 6, 8, 14].includes(slot)) {
-            const ammo = document.createElement('span');
-            ammo.className = 'ammo';
-            const count = Math.max(0, state.ammo[slot]);
-            b.setAttribute('aria-label', `${title}, ${count}`);
-            for (const digit of String(count)) ammo.append(icon(null, `gAmmoDigit${digit}Tex`));
-            b.append(ammo);
-        }
+        showCaption(b, 'item-name', entry.name);
+        appendAmmo(b, entry, 'ammo');
         el('inventory').append(b);
-    });
-    if (selected) el('item-name').textContent = name(selected.item);
-    const gearIcon = (category, value) => 59 + category * 3 + value - 1;
-    const gearAsset = (category, value) => category === 0 && value === 3 ?
-        (state.biggoronSword ? 'gItemIconSwordBiggoronTex' : (state.ownedEquipment & 8) ? 'gItemIconBrokenGiantsKnifeTex' : undefined) : undefined;
-    const gearName = (category, value) => category === 0 && value === 3 ?
-        (state.biggoronSword ? 'Biggoron Sword' : (state.ownedEquipment & 8) ? 'Broken Giant’s Knife' : 'Giant’s Knife') : gearNames[category][value];
-    for (let row = 0; row < 4; ++row) {
-        for (let value = 1; value <= 3; ++value) {
-            const owned = !!(state.ownedEquipment & (1 << (row * 4 + value - 1))) || (row === 0 && value === 3 && !!(state.ownedEquipment & 8));
-            if (!owned) continue;
-            const current = ((state.equipment >> (row * 4)) & 15) === value;
-            const title = gearName(row, value);
-            const allowed = state.equipmentAllowed?.[row * 3 + value - 1] === true;
-            const b = button('', !enabled || !allowed, () => change({
-                action: 'equip',
-                category: row,
-                value,
-                fileNum: state.fileNum,
-                age: state.age
-            }));
-            decorateSlot(b, gearIcon(row, value), 134 + (value - 1) * 32, 24 + row * 32, title, current, gearAsset(row, value));
-            b.classList.toggle('restricted', state.equipmentAllowed?.[row * 3 + value - 1] === false);
-            b.setAttribute('aria-pressed', String(current));
-            showCaption(b, 'gear-name', title);
-            el('gear').append(b);
-        }
     }
-    // Upgrade column from the game's equipment page; older companion builds omit this field.
-    if (state.upgrades !== undefined) {
-        const upgrades = state.upgrades;
-        const quiver = upgrades & 7,
-            bulletBag = (upgrades >> 14) & 7;
-        const levels = [state.age === 1 || !quiver ? bulletBag : quiver, (upgrades >> 3) & 7, (upgrades >> 6) & 7, (upgrades >> 9) & 7];
-        const bases = [state.age === 1 || !quiver ? 71 : 74, 77, 80, 83];
-        const descriptions = [
-            `${state.age === 1 || !quiver ? 'Deku Seed Bullet Bag' : 'Quiver'} (Holds ${[0,30,40,50][levels[0]]})`,
-            `Bomb Bag (Holds ${[0,20,30,40][levels[1]]})`,
-            ['None', 'Goron Bracelet', 'Silver Gauntlets', 'Golden Gauntlets'][levels[2]],
-            ['None', 'Silver Scale', 'Golden Scale'][levels[3]],
-        ];
-        levels.forEach((level, row) => {
-            if (!level) return;
-            const b = document.createElement('div');
-            b.tabIndex = 0;
-            b.setAttribute('role', 'img');
-            decorateSlot(b, bases[row] + level - 1, 8, 24 + row * 32, descriptions[row]);
-            showCaption(b, 'gear-name', descriptions[row]);
-            el('gear').append(b);
-        });
+    if (selected) el('item-name').textContent = state.items[selected.slot].name;
+    for (const entry of state.equipment) {
+        const b = button('', !enabled || !entry.allowed, () => change({
+            action: 'equip',
+            category: entry.category,
+            value: entry.value,
+            fileNum: state.fileNum,
+            age: state.age
+        }));
+        decorateSlot(b, entry, 134 + (entry.value - 1) * 32, 24 + entry.category * 32);
+        b.classList.toggle('restricted', !entry.allowed);
+        b.setAttribute('aria-pressed', String(entry.equipped));
+        showCaption(b, 'gear-name', entry.name);
+        el('gear').append(b);
+    }
+    for (const entry of state.upgrades) {
+        const b = document.createElement('div');
+        b.tabIndex = 0;
+        b.setAttribute('role', 'img');
+        decorateSlot(b, entry, 8, 24 + entry.row * 32);
+        showCaption(b, 'gear-name', entry.name);
+        el('gear').append(b);
     }
     const heading = document.createElement('div');
     heading.className = 'worn-title';
     heading.textContent = 'EQUIPPED';
     el('worn').append(heading);
-    for (let category = 0; category < 4; ++category) {
-        const value = (state.equipment >> (category * 4)) & 15;
+    for (const entry of state.worn) {
         const row = document.createElement('div');
         row.className = 'worn-row';
-        if (value >= 1 && value <= 3) row.append(icon(gearIcon(category, value), gearAsset(category, value)));
+        if (entry.asset) row.append(icon(entry.asset));
         const text = document.createElement('span');
-        text.textContent = value >= 1 && value <= 3 ? gearName(category, value) : 'None';
+        text.textContent = entry.name;
         row.append(text);
         el('worn').append(row);
     }
@@ -338,7 +284,7 @@ async function change(payload) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ ...payload, schemaVersion: 2 })
         });
         const data = await response.json();
         el('message').textContent = data.status === 'success' ? '' : data.message ?? data.status;

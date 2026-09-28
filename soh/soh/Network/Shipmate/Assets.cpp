@@ -10,6 +10,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
@@ -47,19 +48,31 @@ nlohmann::json HudColors() {
              { "dpad", Color("HUD.Dpad", { 255, 255, 255 }) } };
 }
 
-AssetContext CaptureAssets() {
+AssetContext CaptureAssets(const std::string& name) {
     auto manager = Ship::Context::GetRawInstance()->GetResourceManager();
-    return { manager, manager->IsAltAssetsEnabled(), AssetRevision() };
+    AssetContext context{ manager, manager->IsAltAssetsEnabled(), AssetRevision(), {} };
+    if (name.starts_with("item-")) {
+        int item;
+        auto [end, error] = std::from_chars(name.data() + 5, name.data() + name.size(), item);
+        if (error == std::errc() && end == name.data() + name.size() && name == "item-" + std::to_string(item)) {
+            context.itemIconPath = ItemIconPath(item);
+        }
+    }
+    return context;
 }
 
 static Image Texture(const std::string& name, const AssetContext& context) {
-    auto entry = AssetPaths.find(name);
-    if (entry == AssetPaths.end()) {
+    std::string path;
+    if (name.starts_with("item-")) {
+        path = context.itemIconPath;
+    } else if (auto entry = AssetPaths.find(name); entry != AssetPaths.end()) {
+        path = entry->second.substr(7);
+    }
+    if (path.empty()) {
         return {};
     }
     // Exact paths avoid consulting the live alternate-assets flag on a worker.
-    // Strip the OTR signature: its loader shortcut otherwise resets loadExact.
-    const auto path = entry->second.substr(7);
+    // Paths omit the OTR signature, whose loader shortcut otherwise resets loadExact.
     std::shared_ptr<Ship::IResource> loaded;
     if (context.alternate) {
         loaded = context.manager->LoadResourceAsync("alt/" + path, true, BS::pr::low).get();
