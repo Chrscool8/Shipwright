@@ -188,23 +188,29 @@ button {
     filter: drop-shadow(0 0 4px #d6b956);
 }
 
-.assignment:hover:not(:disabled):not(.readonly) {
+button.assignment:hover:not(:disabled) {
     filter: brightness(1.2);
 }
 
-.hud-ammo {
+.ammo, .hud-ammo {
     position: absolute;
-    bottom: -2px;
     right: 0;
-    height: clamp(10px, 3.6cqw, 13px);
     display: flex;
     pointer-events: none;
     filter: drop-shadow(1px 1px #000);
 }
 
-    .hud-ammo img {
+    .ammo img, .hud-ammo img {
         height: 100%;
         width: auto;
+    }
+
+.hud-ammo {
+    bottom: -2px;
+    height: clamp(10px, 3.6cqw, 13px);
+}
+
+    .hud-ammo img {
         image-rendering: pixelated;
     }
 
@@ -308,20 +314,10 @@ button {
 }
 
 .ammo {
-    position: absolute;
     bottom: -3%;
-    right: 0;
     height: 28.57%;
-    display: flex;
     z-index: 4;
-    pointer-events: none;
-    filter: drop-shadow(1px 1px #000);
 }
-
-    .ammo img {
-        height: 100%;
-        width: auto;
-    }
 
 #worn {
     position: absolute;

@@ -138,7 +138,7 @@ function renderButtons(enabled) {
             (selected && !state.items[selected.slot].allowed), () => chooseButton(i));
         let parent;
         if (i < 0) {
-            b.className = 'assignment hud-b readonly';
+            b.className = 'assignment hud-b';
             parent = el('buttons');
         } else if (i < 3) {
             b.className = `assignment hud-c ${positions[i]}`;
