@@ -93,11 +93,14 @@ static Image Texture(const std::string& name, const AssetContext& context) {
         throw std::runtime_error("Unsupported texture dimensions: " + name);
     }
     auto type = resource->Type;
-    if (resource->Flags & TEX_FLAG_LOAD_AS_IMG) {
-        type = Fast::TextureType::RGBA32bpp;
+    using T = Fast::TextureType;
+    // HD raw textures contain RGBA pixels but retain their original N64 type.
+    // Indexed textures still require a palette and are rejected below.
+    if ((resource->Flags & TEX_FLAG_LOAD_AS_IMG) ||
+        ((resource->Flags & TEX_FLAG_LOAD_AS_RAW) && type != T::Palette4bpp && type != T::Palette8bpp)) {
+        type = T::RGBA32bpp;
     }
     int bits = 0;
-    using T = Fast::TextureType;
     switch (type) {
         case T::RGBA32bpp:
             bits = 32;
