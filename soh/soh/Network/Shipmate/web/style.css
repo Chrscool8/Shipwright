@@ -51,7 +51,7 @@ button {
         outline: 2px solid #fff2a9;
         outline-offset: 3px;
     }
-/* Three centered HUD groups; local positions preserve the familiar C-button and D-pad shapes. */
+/* Center the B, C-button, and D-pad groups. */
 #buttons {
     display: grid;
     grid-template-columns: 56fr 116fr 108fr;
@@ -404,7 +404,7 @@ button {
     margin: 0 auto 12px;
 }
 /* Fit the 3:2 panel into the space left after HUD/status controls, reserving
-   53px for the caption and Z/R tabs. Container units react to either axis. */
+   53px for the caption and Z/R tabs. */
 #panels {
     margin: 0;
     flex: 1;

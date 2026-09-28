@@ -2686,9 +2686,7 @@ s32 Inventory_HasSpecificBottle(u8 bottleItem) {
 }
 
 void Inventory_UpdateBottleItem(PlayState* play, u8 item, u8 button) {
-    // An assignment may have changed while the bottle action was in progress.
-	// This is unlikely, but can happen if the inventory is modified externally
-	// via save-editing or Shipmate. The item may be consumed and dissolved.
+    // Ignore bottle updates if the button no longer refers to a bottle slot.
     if (button == 0 || button > ARRAY_COUNT(gSaveContext.equips.cButtonSlots)) {
         return;
     }

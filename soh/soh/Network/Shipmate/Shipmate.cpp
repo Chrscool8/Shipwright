@@ -65,8 +65,7 @@ template <typename F> auto OnGameThread(F fn) -> decltype(fn()) {
         if (job->state.compare_exchange_strong(pending, Job::State::Cancelled) || pending == Job::State::Cancelled) {
             throw std::runtime_error("Ship is not responding; try again when the game is running");
         }
-        // A short game action already claimed this request. Return its actual result;
-        // never report a timeout and then apply an equipment change later.
+        // Wait for running jobs so a timeout cannot precede an equipment change.
     }
     return result.get();
 }
@@ -90,8 +89,7 @@ void RegisterHooks() {
             jobs.pop_front();
             jobsPending.store(!jobs.empty(), std::memory_order_release);
         }
-        // One small snapshot/action/context capture per frame, outside the queue lock.
-        // If a worker owns the queue, gameplay skips it and Shipmate waits.
+        // Run one job per frame without holding the queue lock.
         auto pending = Job::State::Pending;
         if (job->state.compare_exchange_strong(pending, Job::State::Running)) {
             job->run();
@@ -160,7 +158,7 @@ bool Enable(bool lan, int port) {
     InvalidateAssets();
     auto next = std::make_unique<httplib::Server>();
     next->new_task_queue = [] { return new httplib::ThreadPool(4, 16); };
-    // A few idle browser sockets must not occupy the whole small worker pool.
+    // Prevent idle connections from occupying all workers.
     next->set_keep_alive_max_count(1);
     next->set_payload_max_length(4096);
     next->set_read_timeout(2, 0);
@@ -170,7 +168,7 @@ bool Enable(bool lan, int port) {
                                 { "X-Content-Type-Options", "nosniff" },
                                 { "X-Frame-Options", "DENY" } });
     next->set_pre_routing_handler([port](const auto& request, auto& response) {
-        // Browser origin checks, without pairing or credentials.
+        // Reject unrecognized hosts and cross-origin requests.
         const auto host = request.get_header_value("Host");
         const auto origin = request.get_header_value("Origin");
         const auto suffix = std::string(":") + std::to_string(port);
@@ -269,7 +267,7 @@ bool Enable(bool lan, int port) {
         Png(r, request, png, revision);
     });
     if (!next->bind_to_port(lan ? "0.0.0.0" : "127.0.0.1", port)) {
-        error = "Cannot open port " + std::to_string(port) + ". Close the old helper or another Ship instance.";
+        error = "Cannot open port " + std::to_string(port) + ". Try a different port.";
         return false;
     }
     server = std::move(next);

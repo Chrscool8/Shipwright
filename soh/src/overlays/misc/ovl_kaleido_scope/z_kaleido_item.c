@@ -864,8 +864,7 @@ static s16 sCButtonPosY[] = { 110, 92, 110, 76, 44, 62, 62 };
 
 // Shared by the pause menu and Shipmate. Call on the game thread.
 void KaleidoScope_AssignItemToButton(PlayState* play, u16 item, u16 slot, u16 button) {
-    // Skipping the arrow animation: need to change the item's type and
-    // slot when it hits the button since it didn't get set earlier
+    // Convert elemental arrows to their equipped bow variants.
     if (item == ITEM_ARROW_FIRE || item == ITEM_ARROW_ICE || item == ITEM_ARROW_LIGHT) {
         switch (item) {
             case ITEM_ARROW_FIRE:
@@ -902,10 +901,9 @@ void KaleidoScope_AssignItemToButton(PlayState* play, u16 item, u16 slot, u16 bu
                 gSaveContext.equips.buttonItems[otherButtonIndex] = ITEM_NONE;
                 gSaveContext.equips.cButtonSlots[otherSlotIndex] = SLOT_NONE;
             }
-            // break; // 'Assume there is only one possible pre-existing equip'
         }
 
-        // Fix for Equip Dupe
+        // Prevent duplicate bow assignments when elemental arrows share the bow slot.
         if (item == ITEM_BOW) {
             if (gSaveContext.equips.buttonItems[otherButtonIndex] >= ITEM_BOW_ARROW_FIRE &&
                 gSaveContext.equips.buttonItems[otherButtonIndex] <= ITEM_BOW_ARROW_LIGHT &&

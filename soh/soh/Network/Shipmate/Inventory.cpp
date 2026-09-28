@@ -66,7 +66,7 @@ nlohmann::json DescribeItem(int item) {
     if (!Shipmate::ItemIconPath(item).empty()) {
         entry["asset"] = "item-" + std::to_string(item);
     }
-    // The pause menu's ammo table owns the item-to-ammo-slot mapping.
+    // Use the pause menu's ammo-slot mapping.
     int ammoItem = item >= ITEM_BOW_ARROW_FIRE && item <= ITEM_BOW_ARROW_LIGHT ? ITEM_BOW : item;
     for (int slot = 0; slot < ARRAY_COUNT(gSaveContext.inventory.ammo); ++slot) {
         if (ammoItem != ITEM_NONE && gAmmoItems[slot] == ammoItem) {

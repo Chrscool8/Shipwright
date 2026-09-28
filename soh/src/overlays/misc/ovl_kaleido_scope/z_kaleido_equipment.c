@@ -27,7 +27,7 @@ static Vtx sStrengthAButtonVtx[] = {
     VTX(9, -6, 0, 24 << 5, 16 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
 };
 
-// Shared with Shipmate; retain the pause menu's Biggoron/broken-knife handling.
+// Handle Biggoron's Sword and the broken Giant's Knife.
 void KaleidoScope_UpdateSwordItem(u16 sword, u16 item) {
     gSaveContext.infTable[29] = 0;
     gSaveContext.equips.buttonItems[0] = item;

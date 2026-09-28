@@ -207,7 +207,6 @@ Image ReadAsset(const std::string& name, const AssetContext& context) {
     return result;
 }
 
-// RGBA PNGs need only a filter byte per row and zlib, already used by Ship.
 std::string EncodePng(const Image& image) {
     auto integer = [](std::string& out, uint32_t n) {
         for (int shift = 24; shift >= 0; shift -= 8) {
