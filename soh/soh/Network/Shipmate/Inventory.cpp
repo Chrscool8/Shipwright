@@ -101,83 +101,86 @@ std::string Shipmate::ItemIconPath(int item) {
     return std::string_view(path).starts_with("__OTR__") ? std::string(path + 7) : std::string();
 }
 
+nlohmann::json Shipmate::Snapshot() {
+    bool loaded = GameInteractor::IsSaveLoaded();
+    bool canChange = CanChangeEquipment();
+    bool dpad = CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0);
+    nlohmann::json state = { { "schemaVersion", 2 },
+                             { "loaded", loaded },
+                             { "canChange", canChange },
+                             { "assetRevision", AssetRevision() },
+                             { "colors", HudColors() } };
+    if (loaded) {
+        state["fileNum"] = gSaveContext.fileNum;
+        state["age"] = gSaveContext.linkAge;
+        state["items"] = nlohmann::json::array();
+        for (int slot = 0; slot < ARRAY_COUNT(gSaveContext.inventory.items); ++slot) {
+            auto entry = DescribeItem(gSaveContext.inventory.items[slot]);
+            entry["slot"] = slot;
+            entry["allowed"] = CanAssignSlot(slot);
+            entry["equipped"] =
+                std::find(std::begin(gSaveContext.equips.cButtonSlots), std::end(gSaveContext.equips.cButtonSlots),
+                          slot) != std::end(gSaveContext.equips.cButtonSlots);
+            if (slot >= SLOT_BOTTLE_1 && slot <= SLOT_BOTTLE_4) {
+                entry["name"] =
+                    entry["name"].get<std::string>() + " (bottle " + std::to_string(slot - SLOT_BOTTLE_1 + 1) + ")";
+            }
+            state["items"].push_back(std::move(entry));
+        }
+        state["buttons"] = nlohmann::json::array();
+        for (int index = 0; index < ARRAY_COUNT(gSaveContext.equips.buttonItems); ++index) {
+            auto entry = DescribeItem(gSaveContext.equips.buttonItems[index]);
+            entry["button"] = index - 1;
+            entry["slot"] = index == 0 ? SLOT_NONE : gSaveContext.equips.cButtonSlots[index - 1];
+            entry["allowed"] = ButtonAvailable(index - 1, dpad);
+            state["buttons"].push_back(std::move(entry));
+        }
+        state["equipment"] = nlohmann::json::array();
+        state["worn"] = nlohmann::json::array();
+        for (int category = 0; category < EQUIP_TYPE_MAX; ++category) {
+            for (int value = 1; value <= ARRAY_COUNT(EquipmentItems[category]); ++value) {
+                if (OwnsEquipment(category, value)) {
+                    state["equipment"].push_back(DescribeEquipment(category, value));
+                }
+            }
+            int value = CUR_EQUIP_VALUE(category);
+            auto entry = DescribeItem(ITEM_NONE);
+            entry["name"] = "None";
+            if (value > 0 && value <= ARRAY_COUNT(EquipmentItems[category])) {
+                entry = DescribeEquipment(category, value);
+            }
+            state["worn"].push_back(std::move(entry));
+        }
+        const bool bulletBag = LINK_IS_CHILD || CUR_UPG_VALUE(UPG_QUIVER) == 0;
+        const int upgrades[] = { bulletBag ? UPG_BULLET_BAG : UPG_QUIVER, UPG_BOMB_BAG, UPG_STRENGTH, UPG_SCALE };
+        const int bases[] = { bulletBag ? ITEM_BULLET_BAG_30 : ITEM_QUIVER_30, ITEM_BOMB_BAG_20, ITEM_BRACELET,
+                              ITEM_SCALE_SILVER };
+        state["upgrades"] = nlohmann::json::array();
+        for (int row = 0; row < ARRAY_COUNT(upgrades); ++row) {
+            int level = CUR_UPG_VALUE(upgrades[row]);
+            if (level <= 0 || level >= ARRAY_COUNT(gUpgradeCapacities[0])) {
+                continue;
+            }
+            auto entry = DescribeItem(bases[row] + level - 1);
+            entry["row"] = row;
+            int capacity = CAPACITY(upgrades[row], level);
+            if (capacity > 0) {
+                entry["name"] = entry["name"].get<std::string>() + " (Holds " + std::to_string(capacity) + ")";
+            }
+            state["upgrades"].push_back(std::move(entry));
+        }
+    }
+    return { { "status", "success" }, { "state", state } };
+}
+
 nlohmann::json Shipmate::HandleRequest(const nlohmann::json& request) {
     auto fail = [](const char* message) { return nlohmann::json{ { "status", "failure" }, { "message", message } }; };
     if (request.value("schemaVersion", 2) != 2) {
         return fail("Unsupported Shipmate version");
     }
     const auto action = request.at("action").get<std::string>();
-    bool loaded = GameInteractor::IsSaveLoaded();
     bool canChange = CanChangeEquipment();
     bool dpad = CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0);
-    if (action == "snapshot") {
-        nlohmann::json state = { { "schemaVersion", 2 },
-                                 { "loaded", loaded },
-                                 { "canChange", canChange },
-                                 { "assetRevision", AssetRevision() },
-                                 { "colors", HudColors() } };
-        if (loaded) {
-            state["fileNum"] = gSaveContext.fileNum;
-            state["age"] = gSaveContext.linkAge;
-            state["items"] = nlohmann::json::array();
-            for (int slot = 0; slot < ARRAY_COUNT(gSaveContext.inventory.items); ++slot) {
-                auto entry = DescribeItem(gSaveContext.inventory.items[slot]);
-                entry["slot"] = slot;
-                entry["allowed"] = CanAssignSlot(slot);
-                entry["equipped"] =
-                    std::find(std::begin(gSaveContext.equips.cButtonSlots), std::end(gSaveContext.equips.cButtonSlots),
-                              slot) != std::end(gSaveContext.equips.cButtonSlots);
-                if (slot >= SLOT_BOTTLE_1 && slot <= SLOT_BOTTLE_4) {
-                    entry["name"] =
-                        entry["name"].get<std::string>() + " (bottle " + std::to_string(slot - SLOT_BOTTLE_1 + 1) + ")";
-                }
-                state["items"].push_back(std::move(entry));
-            }
-            state["buttons"] = nlohmann::json::array();
-            for (int index = 0; index < ARRAY_COUNT(gSaveContext.equips.buttonItems); ++index) {
-                auto entry = DescribeItem(gSaveContext.equips.buttonItems[index]);
-                entry["button"] = index - 1;
-                entry["slot"] = index == 0 ? SLOT_NONE : gSaveContext.equips.cButtonSlots[index - 1];
-                entry["allowed"] = ButtonAvailable(index - 1, dpad);
-                state["buttons"].push_back(std::move(entry));
-            }
-            state["equipment"] = nlohmann::json::array();
-            state["worn"] = nlohmann::json::array();
-            for (int category = 0; category < EQUIP_TYPE_MAX; ++category) {
-                for (int value = 1; value <= ARRAY_COUNT(EquipmentItems[category]); ++value) {
-                    if (OwnsEquipment(category, value)) {
-                        state["equipment"].push_back(DescribeEquipment(category, value));
-                    }
-                }
-                int value = CUR_EQUIP_VALUE(category);
-                auto entry = DescribeItem(ITEM_NONE);
-                entry["name"] = "None";
-                if (value > 0 && value <= ARRAY_COUNT(EquipmentItems[category])) {
-                    entry = DescribeEquipment(category, value);
-                }
-                state["worn"].push_back(std::move(entry));
-            }
-            const bool bulletBag = LINK_IS_CHILD || CUR_UPG_VALUE(UPG_QUIVER) == 0;
-            const int upgrades[] = { bulletBag ? UPG_BULLET_BAG : UPG_QUIVER, UPG_BOMB_BAG, UPG_STRENGTH, UPG_SCALE };
-            const int bases[] = { bulletBag ? ITEM_BULLET_BAG_30 : ITEM_QUIVER_30, ITEM_BOMB_BAG_20, ITEM_BRACELET,
-                                  ITEM_SCALE_SILVER };
-            state["upgrades"] = nlohmann::json::array();
-            for (int row = 0; row < ARRAY_COUNT(upgrades); ++row) {
-                int level = CUR_UPG_VALUE(upgrades[row]);
-                if (level <= 0 || level >= ARRAY_COUNT(gUpgradeCapacities[0])) {
-                    continue;
-                }
-                auto entry = DescribeItem(bases[row] + level - 1);
-                entry["row"] = row;
-                int capacity = CAPACITY(upgrades[row], level);
-                if (capacity > 0) {
-                    entry["name"] = entry["name"].get<std::string>() + " (Holds " + std::to_string(capacity) + ")";
-                }
-                state["upgrades"].push_back(std::move(entry));
-            }
-        }
-        return { { "status", "success" }, { "state", state } };
-    }
     if (!canChange) {
         return fail("Wait until Link is in control, outside menus and transitions");
     }

@@ -269,9 +269,7 @@ bool Enable(bool lan, int port) {
     next->Get("/", [](const auto&, auto& r) { r.set_content(Web::Html, "text/html; charset=utf-8"); });
     next->Get("/app.js", [](const auto&, auto& r) { r.set_content(Web::Js, "text/javascript; charset=utf-8"); });
     next->Get("/style.css", [](const auto&, auto& r) { r.set_content(Web::Css, "text/css; charset=utf-8"); });
-    next->Get("/state", [](const auto&, auto& r) {
-        Json(r, OnGameThread([] { return HandleRequest({ { "action", "snapshot" } }); }));
-    });
+    next->Get("/state", [](const auto&, auto& r) { Json(r, OnGameThread(Snapshot)); });
     next->Post("/action", [](const auto& request, auto& r) {
         auto payload = nlohmann::json::parse(request.body, nullptr, false);
         if (!request.get_header_value("Content-Type").starts_with("application/json") || !payload.is_object() ||
