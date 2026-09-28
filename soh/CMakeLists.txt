@@ -838,7 +838,7 @@ if(SHIPMATE_SUPPORTED)
     endif()
     target_include_directories(soh SYSTEM PRIVATE "${SHIPMATE_DEPS}")
     target_include_directories(soh PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-    target_link_libraries(soh PRIVATE ZLIB::ZLIB)
+    target_link_libraries(soh PRIVATE N64Graphics)
     set(SHIPMATE_WEB "${CMAKE_CURRENT_SOURCE_DIR}/soh/Network/Shipmate/web")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
         "${SHIPMATE_WEB}/index.html" "${SHIPMATE_WEB}/app.js" "${SHIPMATE_WEB}/style.css")

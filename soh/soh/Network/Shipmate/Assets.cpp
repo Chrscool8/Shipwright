@@ -5,7 +5,7 @@
 #include <fast/resource/type/Texture.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "soh/cvar_prefixes.h"
-#include <zlib.h>
+#include <stb_image_write.h>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -208,40 +208,13 @@ Image ReadAsset(const std::string& name, const AssetContext& context) {
 }
 
 std::string EncodePng(const Image& image) {
-    auto integer = [](std::string& out, uint32_t n) {
-        for (int shift = 24; shift >= 0; shift -= 8) {
-            out.push_back(char(n >> shift));
-        }
+    std::string result;
+    auto append = [](void* context, void* data, int size) {
+        static_cast<std::string*>(context)->append(static_cast<const char*>(data), size);
     };
-    std::string result("\x89PNG\r\n\x1a\n", 8);
-    auto chunk = [&](const char* type, const std::string& bytes) {
-        integer(result, uint32_t(bytes.size()));
-        size_t start = result.size();
-        result.append(type, 4);
-        result += bytes;
-        integer(result, crc32(0, reinterpret_cast<const Bytef*>(result.data() + start), uInt(4 + bytes.size())));
-    };
-    std::string header;
-    integer(header, image.width);
-    integer(header, image.height);
-    header.append("\x08\x06\0\0\0", 5);
-    chunk("IHDR", header);
-    std::string rows;
-    const size_t stride = size_t(image.width) * 4;
-    rows.reserve((stride + 1) * image.height);
-    for (int y = 0; y < image.height; ++y) {
-        rows.push_back(0);
-        rows.append(reinterpret_cast<const char*>(image.rgba.data() + size_t(y) * stride), stride);
-    }
-    uLongf size = compressBound(uLong(rows.size()));
-    std::string compressed(size, '\0');
-    if (compress2(reinterpret_cast<Bytef*>(compressed.data()), &size, reinterpret_cast<const Bytef*>(rows.data()),
-                  uLong(rows.size()), Z_BEST_SPEED) != Z_OK) {
+    if (!stbi_write_png_to_func(append, &result, image.width, image.height, 4, image.rgba.data(), image.width * 4)) {
         throw std::runtime_error("PNG encoding failed");
     }
-    compressed.resize(size);
-    chunk("IDAT", compressed);
-    chunk("IEND", "");
     return result;
 }
 } // namespace Shipmate
