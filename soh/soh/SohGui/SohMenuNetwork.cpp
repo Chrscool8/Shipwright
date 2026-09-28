@@ -54,8 +54,8 @@ void SohMenu::AddMenuNetwork() {
     });
     AddWidget(path, "Allow LAN access", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_REMOTE("Shipmate.LAN"))
-        .Options(CheckboxOptions().Tooltip(
-            "Let devices on your network open Shipmate at this PC's IP and configured port."))
+        .Options(
+            CheckboxOptions().Tooltip("Let devices on your network open Shipmate at this PC's IP and configured port."))
         .Callback([](WidgetInfo&) {
             if (Shipmate::IsEnabled() &&
                 !Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
@@ -78,8 +78,8 @@ void SohMenu::AddMenuNetwork() {
         static bool valid = false;
         if (previousUrl != url) {
             uint8_t scratch[sizeof(qr)];
-            valid = qrcodegen_encodeText(url.c_str(), scratch, qr, qrcodegen_Ecc_MEDIUM, 1, 4,
-                                        qrcodegen_Mask_AUTO, true);
+            valid =
+                qrcodegen_encodeText(url.c_str(), scratch, qr, qrcodegen_Ecc_MEDIUM, 1, 4, qrcodegen_Mask_AUTO, true);
             previousUrl = url;
         }
         ImGui::TextUnformatted("Scan with your phone on the same Wi-Fi.");

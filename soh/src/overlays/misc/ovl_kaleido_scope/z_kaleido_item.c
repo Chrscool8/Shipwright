@@ -1221,7 +1221,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
             osSyncPrintf("\n＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝\n");
 
             KaleidoScope_AssignItemToButton(play, pauseCtx->equipTargetItem, pauseCtx->equipTargetSlot,
-                                           pauseCtx->equipTargetCBtn);
+                                            pauseCtx->equipTargetCBtn);
 
             pauseCtx->unk_1E4 = 0;
             sEquipMoveTimer = 10;
