@@ -6,7 +6,9 @@
 #include "soh/OTRGlobals.h"
 #include "soh/util.h"
 #include <soh/Network/Sail/Sail.h>
+#ifdef ENABLE_SHIPMATE
 #include <soh/Network/Shipmate/Shipmate.h>
+#endif
 #include <soh/Network/CrowdControl/CrowdControl.h>
 #include "soh/SohGui/UIWidgets.hpp"
 
@@ -20,6 +22,7 @@ void SohMenu::AddMenuNetwork() {
     AddMenuEntry("Network", CVAR_SETTING("Menu.NetworkSidebarSection"));
     WidgetPath path;
 
+#ifdef ENABLE_SHIPMATE
     path = { "Network", "Shipmate", SECTION_COLUMN_1 };
     AddSidebarEntry("Network", path.sidebarName, 1);
     AddWidget(path, "Enable##Shipmate", WIDGET_CVAR_CHECKBOX)
@@ -45,6 +48,7 @@ void SohMenu::AddMenuNetwork() {
         info.isHidden = Shipmate::Error().empty();
         info.name = Shipmate::Error() + "##ShipmateError";
     });
+#endif
 
     // Sail
     path = { "Network", "Sail", SECTION_COLUMN_1 };

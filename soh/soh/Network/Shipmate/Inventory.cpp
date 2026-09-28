@@ -9,10 +9,9 @@ extern PlayState* gPlayState;
 }
 
 static bool CanChangeEquipment() {
-    return GameInteractor::IsSaveLoaded() && GameInteractor::IsPlayerInControl() &&
-           gSaveContext.health > 0 && gPlayState->transitionTrigger == 0 && gPlayState->transitionMode == 0 &&
-           gSaveContext.minigameState == 0 && !gPlayState->shootingGalleryStatus &&
-           !(GET_PLAYER(gPlayState)->stateFlags1 & PLAYER_STATE1_ON_HORSE);
+    return GameInteractor::IsSaveLoaded() && GameInteractor::IsPlayerInControl() && gSaveContext.health > 0 &&
+           gPlayState->transitionTrigger == 0 && gPlayState->transitionMode == 0 && gSaveContext.minigameState == 0 &&
+           !gPlayState->shootingGalleryStatus && !(GET_PLAYER(gPlayState)->stateFlags1 & PLAYER_STATE1_ON_HORSE);
 }
 
 static bool CanAssignSlot(int slot) {
@@ -30,9 +29,7 @@ static bool CanAssignSlot(int slot) {
 }
 
 nlohmann::json Shipmate::HandleRequest(const nlohmann::json& request) {
-    auto fail = [](const char* message) {
-        return nlohmann::json{{"status", "failure"}, {"message", message}};
-    };
+    auto fail = [](const char* message) { return nlohmann::json{ { "status", "failure" }, { "message", message } }; };
     if (request.value("schemaVersion", 1) != 1) {
         return fail("Unsupported Shipmate version");
     }
@@ -41,8 +38,12 @@ nlohmann::json Shipmate::HandleRequest(const nlohmann::json& request) {
     bool canChange = CanChangeEquipment();
     bool dpad = CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0);
     if (action == "snapshot") {
-        nlohmann::json state = {{"schemaVersion", 1}, {"loaded", loaded}, {"canChange", canChange},
-                                {"dpadEnabled", dpad}, {"assetRevision", AssetRevision()}, {"colors", HudColors()}};
+        nlohmann::json state = { { "schemaVersion", 1 },
+                                 { "loaded", loaded },
+                                 { "canChange", canChange },
+                                 { "dpadEnabled", dpad },
+                                 { "assetRevision", AssetRevision() },
+                                 { "colors", HudColors() } };
         if (loaded) {
             state["fileNum"] = gSaveContext.fileNum;
             state["age"] = gSaveContext.linkAge;
@@ -65,7 +66,7 @@ nlohmann::json Shipmate::HandleRequest(const nlohmann::json& request) {
                 state["assignable"].push_back(CanAssignSlot(slot));
             }
         }
-        return {{"status", "success"}, {"state", state}};
+        return { { "status", "success" }, { "state", state } };
     }
     if (!canChange) {
         return fail("Wait until Link is in control, outside menus and transitions");
@@ -124,5 +125,5 @@ nlohmann::json Shipmate::HandleRequest(const nlohmann::json& request) {
     } else {
         return fail("Unknown Shipmate action");
     }
-    return {{"status", "success"}, {"message", "Equipment updated"}};
+    return { { "status", "success" }, { "message", "Equipment updated" } };
 }
