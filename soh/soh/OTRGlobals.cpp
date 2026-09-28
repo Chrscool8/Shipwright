@@ -83,6 +83,7 @@
 #include "SaveManager.h"
 #include "soh/Network/CrowdControl/CrowdControl.h"
 #include "soh/Network/Sail/Sail.h"
+#include "soh/Network/Shipmate/Shipmate.h"
 #include "soh/Network/Anchor/Anchor.h"
 #include "Enhancements/game-interactor/GameInteractor.h"
 #include "Enhancements/randomizer/draw.h"
@@ -1667,6 +1668,7 @@ extern "C" void SaveManager_ThreadPoolWait() {
 }
 
 extern "C" void DeinitOTR() {
+    Shipmate::Disable();
     SaveManager_ThreadPoolWait();
     OTRAudio_Exit();
     if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {

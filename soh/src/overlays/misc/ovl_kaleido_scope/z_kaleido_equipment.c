@@ -27,6 +27,25 @@ static Vtx sStrengthAButtonVtx[] = {
     VTX(9, -6, 0, 24 << 5, 16 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
 };
 
+// Shared with Shipmate; retain the pause menu's Biggoron/broken-knife handling.
+void KaleidoScope_UpdateSwordItem(u16 sword, u16 item) {
+    gSaveContext.infTable[29] = 0;
+    gSaveContext.equips.buttonItems[0] = item;
+
+    if ((sword == 3) && (gSaveContext.bgsFlag != 0)) {
+        gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
+        gSaveContext.swordHealth = 8;
+    } else {
+        if (gSaveContext.equips.buttonItems[0] == ITEM_HEART_PIECE_2) {
+            gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
+        }
+        if ((gSaveContext.equips.buttonItems[0] == ITEM_SWORD_BGS) && (gSaveContext.bgsFlag == 0) &&
+            CHECK_OWNED_EQUIP_ALT(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_BROKENGIANTKNIFE)) {
+            gSaveContext.equips.buttonItems[0] = ITEM_SWORD_KNIFE;
+        }
+    }
+}
+
 static s16 sEquipTimer = 0;
 
 extern int gPauseLinkFrameBuffer;
@@ -620,21 +639,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
 
                 RESUME_EQUIPMENT:
                     if (pauseCtx->cursorY[PAUSE_EQUIP] == 0) {
-                        gSaveContext.infTable[29] = 0;
-                        gSaveContext.equips.buttonItems[0] = cursorItem;
-
-                        if ((pauseCtx->cursorX[PAUSE_EQUIP] == 3) && (gSaveContext.bgsFlag != 0)) {
-                            gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
-                            gSaveContext.swordHealth = 8;
-                        } else {
-                            if (gSaveContext.equips.buttonItems[0] == ITEM_HEART_PIECE_2) {
-                                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
-                            }
-                            if ((gSaveContext.equips.buttonItems[0] == ITEM_SWORD_BGS) && (gSaveContext.bgsFlag == 0) &&
-                                CHECK_OWNED_EQUIP_ALT(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_BROKENGIANTKNIFE)) {
-                                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_KNIFE;
-                            }
-                        }
+                        KaleidoScope_UpdateSwordItem(pauseCtx->cursorX[PAUSE_EQUIP], cursorItem);
                     RESUME_EQUIPMENT_SWORD:
                         Interface_LoadItemIcon1(play, 0);
                     }

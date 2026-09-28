@@ -1,0 +1,75 @@
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0 auto; padding: clamp(8px, 2dvh, 24px) 20px; height: 100dvh; max-width: 820px; display: flex; flex-direction: column; background: #101311; color: #eee9d8; font: 15px system-ui, sans-serif; }
+body > * { flex-shrink: 0; }
+#status { color: #b8c2b4; font-size: 13px; }
+button { font: inherit; color: inherit; background: #242d29; border: 1px solid #687669; border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+button:disabled { cursor: default; opacity: .5; }
+button[aria-pressed="true"] { border-color: #e5cd77; background: #424331; }
+button:focus-visible { outline: 2px solid #fff2a9; outline-offset: 3px; }
+/* Three centered HUD groups; local positions preserve the familiar C-button and D-pad shapes. */
+#buttons { display: grid; grid-template-columns: 56fr 116fr 108fr; align-items: center; gap: clamp(12px, 4vw, 24px); width: min(100%, 360px, 50dvh); margin: 0 auto clamp(6px, 2dvh, 18px); container-type: inline-size; }
+.assignment { position: absolute; padding: 0; min-width: 0; border: 0; border-radius: 50%; background: transparent; aspect-ratio: 1; }
+.assignment img { image-rendering: auto; pointer-events: none; }
+.assignment .button-background, .assignment .empty-c-arrow { position: absolute; inset: 0; width: 100%; height: 100%; }
+.assignment .assigned-icon { position: absolute; inset: 8%; width: 84%; height: 84%; object-fit: contain; }
+.assignment.hud-b { position: relative; grid-column: 1; grid-row: 1; width: 100%; }
+.hud-c-buttons { position: relative; grid-column: 2; grid-row: 1; width: 100%; aspect-ratio: 116 / 96; }
+.hud-c { width: 38%; }
+.hud-c.left { left: 0; top: 0; } .hud-c.right { right: 0; top: 0; }
+.hud-c.down { left: 31%; bottom: 0; }
+.hud-dpad { position: relative; grid-column: 3; grid-row: 1; width: 100%; aspect-ratio: 1; }
+.dpad-background { position: absolute; left: 22%; top: 22%; width: 56%; height: 56%; pointer-events: none; }
+.hud-direction { width: 36%; border-radius: 6px; }
+.hud-direction.up { left: 32%; top: 0; } .hud-direction.down { left: 32%; bottom: 0; }
+.hud-direction.left { left: 0; top: 32%; } .hud-direction.right { right: 0; top: 32%; }
+.assignment.hud-direction .assigned-icon { inset: 6%; width: 88%; height: 88%; }
+.assignment[aria-pressed="true"] { background: transparent; outline: 2px solid #fff2a9; outline-offset: 3px; filter: drop-shadow(0 0 4px #d6b956); }
+.assignment:hover:not(:disabled):not(.readonly) { filter: brightness(1.2); }
+.assignment:focus-visible { outline: 2px solid #fff2a9; outline-offset: 3px; }
+.hud-ammo { position: absolute; bottom: -2px; right: 0; height: clamp(10px, 3.6cqw, 13px); display: flex; pointer-events: none; filter: drop-shadow(1px 1px #000); }
+.hud-ammo img { height: 100%; width: auto; image-rendering: pixelated; }
+#message { color: #f0d475; }
+#panels[data-view="items"] #equipment-panel, #panels[data-view="equipment"] #items-panel { display: none; }
+.pause-panel { position: relative; aspect-ratio: 3 / 2; background-size: 100% 100%; image-rendering: pixelated; container-type: inline-size; }
+.pause-panel.items { background-image: url('/assets/items.png'); }
+.pause-panel.equipment { background-image: url('/assets/equipment.png'); }
+.slot { position: absolute; width: 11.666667%; height: 17.5%; padding: 0; border: none; border-radius: 0; background: transparent; display: grid; place-items: center; }
+.slot img.icon { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; }
+.slot:disabled { opacity: 1; }
+.slot.restricted img.icon { filter: grayscale(1) brightness(.5); }
+.slot[aria-pressed="true"] { background: transparent; }
+.slot:hover:not(:disabled) img.icon, .slot[aria-pressed="true"] img.icon { transform: scale(1.12); }
+.slot .equipped { position: absolute; width: 114.2857%; height: 114.2857%; z-index: 0; filter: sepia(1) saturate(5); }
+.cursor { position: absolute; width: 50%; height: 50%; z-index: 3; display: none; pointer-events: none; }
+.cursor.TopLeft { left: -10%; top: -10%; } .cursor.TopRight { right: -10%; top: -10%; }
+.cursor.BottomLeft { left: -10%; bottom: -10%; } .cursor.BottomRight { right: -10%; bottom: -10%; }
+.slot[aria-pressed="true"] .cursor, .slot:hover:not(:disabled) .cursor, .slot:focus-visible .cursor { display: block; }
+.ammo { position: absolute; bottom: -3%; right: 0; height: 28.57%; display: flex; z-index: 4; pointer-events: none; filter: drop-shadow(1px 1px #000); }
+.ammo img { height: 100%; width: auto; }
+#worn { position: absolute; left: 18%; top: 21%; width: 35%; height: 68%; display: flex; flex-direction: column; justify-content: space-evenly; }
+#worn .worn-title { text-align: center; color: #adb592; font-size: 2.8cqw; letter-spacing: .08em; }
+.worn-row { display: flex; align-items: center; gap: 3%; color: #e2e5cb; font-size: 3cqw; line-height: 1.1; }
+.worn-row img { width: 28%; image-rendering: pixelated; }
+.caption { text-align: center; min-height: 32px; padding: 5px 12px; margin: 0; grid-column: 2; grid-row: 1; background: #202b2a; border: 1px solid #6e806c; border-radius: 14px; color: #fff; text-shadow: 1px 2px #000; }
+#asset-warning { color: #f0d475; }
+@media (max-width: 760px) { body { padding-inline: 12px; } }
+
+#status, #message { text-align: center; font-size: 13px; margin: 8px 0; }
+#status:empty, #message:empty { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#unassign { display: block; margin: 0 auto 12px; }
+/* Fit the 3:2 panel into the space left after HUD/status controls, reserving
+   53px for the caption and Z/R tabs. Container units react to either axis. */
+#panels { margin: 0; flex: 1; min-height: 0; container-type: size; }
+#panels > section { width: min(100cqw, max(0px, calc((100cqh - 53px) * 1.5))); margin-inline: auto; }
+.caption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-footer { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 8px; align-items: center; margin: 5px 4% 0; }
+/* Original pause-menu Z/R tabs (the left asset is named gLButtonTex in the game). */
+.page-switch { width: 36px; height: 48px; grid-row: 1; padding: 0; border: 0; border-radius: 0; z-index: 5; background: transparent center / contain no-repeat;
+  /* The 24x32 texture has six transparent bottom rows: center its visible 24x26 artwork. */
+  background-position: center calc(50% + 4.5px);
+}
+.page-switch.left { grid-column: 1; background-image: url('/assets/gLButtonTex.png'); }
+.page-switch.right { grid-column: 3; background-image: url('/assets/gRButtonTex.png'); }
+.page-switch:hover { filter: brightness(1.2); }

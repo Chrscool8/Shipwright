@@ -862,6 +862,71 @@ void KaleidoScope_SetupItemEquip(PlayState* play, u16 item, u16 slot, s16 animX,
 static s16 sCButtonPosX[] = { 66, 90, 114, 110, 110, 86, 134 };
 static s16 sCButtonPosY[] = { 110, 92, 110, 76, 44, 62, 62 };
 
+// Shared by the pause menu and Shipmate. Call on the game thread.
+void KaleidoScope_AssignItemToButton(PlayState* play, u16 item, u16 slot, u16 button) {
+    // Skipping the arrow animation: need to change the item's type and
+    // slot when it hits the button since it didn't get set earlier
+    if (item == ITEM_ARROW_FIRE || item == ITEM_ARROW_ICE ||
+        item == ITEM_ARROW_LIGHT) {
+        switch (item) {
+            case ITEM_ARROW_FIRE:
+                item = ITEM_BOW_ARROW_FIRE;
+                break;
+            case ITEM_ARROW_ICE:
+                item = ITEM_BOW_ARROW_ICE;
+                break;
+            case ITEM_ARROW_LIGHT:
+                item = ITEM_BOW_ARROW_LIGHT;
+                break;
+        }
+        if (!CVarGetInteger(CVAR_ENHANCEMENT("SeparateArrows"), 0)) {
+            slot = SLOT_BOW;
+        }
+    }
+
+    // If the item is on another button already, swap the two
+    uint16_t targetButtonIndex = button + 1;
+    for (uint16_t otherSlotIndex = 0; otherSlotIndex < ARRAY_COUNT(gSaveContext.equips.cButtonSlots);
+         otherSlotIndex++) {
+        uint16_t otherButtonIndex = otherSlotIndex + 1;
+        if (otherSlotIndex == button) {
+            continue;
+        }
+
+        if (slot == gSaveContext.equips.cButtonSlots[otherSlotIndex]) {
+            // Assign the other button to the target's current item
+            if (gSaveContext.equips.buttonItems[targetButtonIndex] != ITEM_NONE) {
+                gSaveContext.equips.buttonItems[otherButtonIndex] =
+                    gSaveContext.equips.buttonItems[targetButtonIndex];
+                gSaveContext.equips.cButtonSlots[otherSlotIndex] =
+                    gSaveContext.equips.cButtonSlots[button];
+                Interface_LoadItemIcon2(play, otherButtonIndex);
+            } else {
+                gSaveContext.equips.buttonItems[otherButtonIndex] = ITEM_NONE;
+                gSaveContext.equips.cButtonSlots[otherSlotIndex] = SLOT_NONE;
+            }
+            // break; // 'Assume there is only one possible pre-existing equip'
+        }
+
+        // Fix for Equip Dupe
+        if (item == ITEM_BOW) {
+            if (gSaveContext.equips.buttonItems[otherButtonIndex] >= ITEM_BOW_ARROW_FIRE &&
+                gSaveContext.equips.buttonItems[otherButtonIndex] <= ITEM_BOW_ARROW_LIGHT &&
+                !CVarGetInteger(CVAR_ENHANCEMENT("SeparateArrows"), 0)) {
+                gSaveContext.equips.buttonItems[otherButtonIndex] =
+                    gSaveContext.equips.buttonItems[targetButtonIndex];
+                gSaveContext.equips.cButtonSlots[otherSlotIndex] =
+                    gSaveContext.equips.cButtonSlots[button];
+                Interface_LoadItemIcon2(play, otherButtonIndex);
+            }
+        }
+    }
+
+    gSaveContext.equips.buttonItems[targetButtonIndex] = item;
+    gSaveContext.equips.cButtonSlots[button] = slot;
+    Interface_LoadItemIcon1(play, targetButtonIndex);
+}
+
 void KaleidoScope_UpdateItemEquip(PlayState* play) {
     static s16 D_8082A488 = 0;
     PauseContext* pauseCtx = &play->pauseCtx;
@@ -1162,67 +1227,8 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
 
             osSyncPrintf("\n＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝\n");
 
-            // Skipping the arrow animation: need to change the item's type and
-            // slot when it hits the button since it didn't get set earlier
-            if (pauseCtx->equipTargetItem == ITEM_ARROW_FIRE || pauseCtx->equipTargetItem == ITEM_ARROW_ICE ||
-                pauseCtx->equipTargetItem == ITEM_ARROW_LIGHT) {
-                switch (pauseCtx->equipTargetItem) {
-                    case ITEM_ARROW_FIRE:
-                        pauseCtx->equipTargetItem = ITEM_BOW_ARROW_FIRE;
-                        break;
-                    case ITEM_ARROW_ICE:
-                        pauseCtx->equipTargetItem = ITEM_BOW_ARROW_ICE;
-                        break;
-                    case ITEM_ARROW_LIGHT:
-                        pauseCtx->equipTargetItem = ITEM_BOW_ARROW_LIGHT;
-                        break;
-                }
-                if (!CVarGetInteger(CVAR_ENHANCEMENT("SeparateArrows"), 0)) {
-                    pauseCtx->equipTargetSlot = SLOT_BOW;
-                }
-            }
-
-            // If the item is on another button already, swap the two
-            uint16_t targetButtonIndex = pauseCtx->equipTargetCBtn + 1;
-            for (uint16_t otherSlotIndex = 0; otherSlotIndex < ARRAY_COUNT(gSaveContext.equips.cButtonSlots);
-                 otherSlotIndex++) {
-                uint16_t otherButtonIndex = otherSlotIndex + 1;
-                if (otherSlotIndex == pauseCtx->equipTargetCBtn) {
-                    continue;
-                }
-
-                if (pauseCtx->equipTargetSlot == gSaveContext.equips.cButtonSlots[otherSlotIndex]) {
-                    // Assign the other button to the target's current item
-                    if (gSaveContext.equips.buttonItems[targetButtonIndex] != ITEM_NONE) {
-                        gSaveContext.equips.buttonItems[otherButtonIndex] =
-                            gSaveContext.equips.buttonItems[targetButtonIndex];
-                        gSaveContext.equips.cButtonSlots[otherSlotIndex] =
-                            gSaveContext.equips.cButtonSlots[pauseCtx->equipTargetCBtn];
-                        Interface_LoadItemIcon2(play, otherButtonIndex);
-                    } else {
-                        gSaveContext.equips.buttonItems[otherButtonIndex] = ITEM_NONE;
-                        gSaveContext.equips.cButtonSlots[otherSlotIndex] = SLOT_NONE;
-                    }
-                    // break; // 'Assume there is only one possible pre-existing equip'
-                }
-
-                // Fix for Equip Dupe
-                if (pauseCtx->equipTargetItem == ITEM_BOW) {
-                    if (gSaveContext.equips.buttonItems[otherButtonIndex] >= ITEM_BOW_ARROW_FIRE &&
-                        gSaveContext.equips.buttonItems[otherButtonIndex] <= ITEM_BOW_ARROW_LIGHT &&
-                        !CVarGetInteger(CVAR_ENHANCEMENT("SeparateArrows"), 0)) {
-                        gSaveContext.equips.buttonItems[otherButtonIndex] =
-                            gSaveContext.equips.buttonItems[targetButtonIndex];
-                        gSaveContext.equips.cButtonSlots[otherSlotIndex] =
-                            gSaveContext.equips.cButtonSlots[pauseCtx->equipTargetCBtn];
-                        Interface_LoadItemIcon2(play, otherButtonIndex);
-                    }
-                }
-            }
-
-            gSaveContext.equips.buttonItems[targetButtonIndex] = pauseCtx->equipTargetItem;
-            gSaveContext.equips.cButtonSlots[pauseCtx->equipTargetCBtn] = pauseCtx->equipTargetSlot;
-            Interface_LoadItemIcon1(play, targetButtonIndex);
+            KaleidoScope_AssignItemToButton(play, pauseCtx->equipTargetItem, pauseCtx->equipTargetSlot,
+                                           pauseCtx->equipTargetCBtn);
 
             pauseCtx->unk_1E4 = 0;
             sEquipMoveTimer = 10;

@@ -803,3 +803,22 @@ wut_create_wuhb(${PROJECT_NAME}
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/soh.rpx ${CMAKE_CURRENT_BINARY_DIR}/soh.wuhb DESTINATION . COMPONENT ship)
 
 endif()
+
+# Shipmate: pinned HTTP-only header; no TLS/compression dependencies.
+set(SHIPMATE_DEPS "${CMAKE_BINARY_DIR}/_deps/shipmate")
+file(MAKE_DIRECTORY "${SHIPMATE_DEPS}")
+if(NOT EXISTS "${SHIPMATE_DEPS}/httplib.h")
+    file(DOWNLOAD "https://raw.githubusercontent.com/yhirose/cpp-httplib/v0.18.7/httplib.h"
+        "${SHIPMATE_DEPS}/httplib.h"
+        EXPECTED_HASH SHA256=4770f8ea3d3fcd27b0b713c783d9b53bce3baddbd5adad13714011df96142526)
+endif()
+target_include_directories(soh SYSTEM PRIVATE "${SHIPMATE_DEPS}")
+target_include_directories(soh PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(soh PRIVATE ZLIB::ZLIB)
+set(SHIPMATE_WEB "${CMAKE_CURRENT_SOURCE_DIR}/soh/Network/Shipmate/web")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${SHIPMATE_WEB}/index.html" "${SHIPMATE_WEB}/app.js" "${SHIPMATE_WEB}/style.css")
+file(READ "${SHIPMATE_WEB}/index.html" SHIPMATE_HTML)
+file(READ "${SHIPMATE_WEB}/app.js" SHIPMATE_JS)
+file(READ "${SHIPMATE_WEB}/style.css" SHIPMATE_CSS)
+configure_file(soh/Network/Shipmate/Web.h.in ShipmateWeb.h @ONLY)

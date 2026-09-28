@@ -6,6 +6,7 @@
 #include "soh/OTRGlobals.h"
 #include "soh/util.h"
 #include <soh/Network/Sail/Sail.h>
+#include <soh/Network/Shipmate/Shipmate.h>
 #include <soh/Network/CrowdControl/CrowdControl.h>
 #include "soh/SohGui/UIWidgets.hpp"
 
@@ -18,6 +19,32 @@ void SohMenu::AddMenuNetwork() {
     // Add Network Menu
     AddMenuEntry("Network", CVAR_SETTING("Menu.NetworkSidebarSection"));
     WidgetPath path;
+
+    path = { "Network", "Shipmate", SECTION_COLUMN_1 };
+    AddSidebarEntry("Network", path.sidebarName, 1);
+    AddWidget(path, "Enable##Shipmate", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_REMOTE("Shipmate.Enabled"))
+        .Callback([](WidgetInfo&) {
+            if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0)) {
+                if (!Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0)))
+                    CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
+            } else Shipmate::Disable();
+        });
+    AddWidget(path, "Allow LAN access", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_REMOTE("Shipmate.LAN"))
+        .Options(CheckboxOptions().Tooltip("Let devices on your network open Shipmate at this PC's IP, port 43385. No password."))
+        .Callback([](WidgetInfo&) {
+            if (Shipmate::IsEnabled() && !Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0)))
+                CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
+        });
+    AddWidget(path, "Open Shipmate", WIDGET_BUTTON)
+        .PreFunc([](WidgetInfo& info) { info.options->disabled = !Shipmate::IsEnabled(); })
+        .Callback([](WidgetInfo&) { SDL_OpenURL("http://127.0.0.1:43385/"); });
+    AddWidget(path, "http://127.0.0.1:43385/", WIDGET_TEXT);
+    AddWidget(path, "##ShipmateError", WIDGET_TEXT).PreFunc([](WidgetInfo& info) {
+        info.isHidden = Shipmate::Error().empty();
+        info.name = Shipmate::Error() + "##ShipmateError";
+    });
 
     // Sail
     path = { "Network", "Sail", SECTION_COLUMN_1 };
