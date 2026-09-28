@@ -105,8 +105,7 @@ nlohmann::json Shipmate::Snapshot() {
     bool loaded = GameInteractor::IsSaveLoaded();
     bool canChange = CanChangeEquipment();
     bool dpad = CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0);
-    nlohmann::json state = { { "schemaVersion", 2 },
-                             { "loaded", loaded },
+    nlohmann::json state = { { "loaded", loaded },
                              { "canChange", canChange },
                              { "assetRevision", AssetRevision() },
                              { "colors", HudColors() } };
@@ -175,9 +174,6 @@ nlohmann::json Shipmate::Snapshot() {
 
 nlohmann::json Shipmate::HandleRequest(const nlohmann::json& request) {
     auto fail = [](const char* message) { return nlohmann::json{ { "status", "failure" }, { "message", message } }; };
-    if (request.value("schemaVersion", 2) != 2) {
-        return fail("Unsupported Shipmate version");
-    }
     const auto action = request.at("action").get<std::string>();
     bool canChange = CanChangeEquipment();
     bool dpad = CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0);
@@ -235,5 +231,5 @@ nlohmann::json Shipmate::HandleRequest(const nlohmann::json& request) {
     } else {
         return fail("Unknown Shipmate action");
     }
-    return { { "status", "success" }, { "message", "Equipment updated" } };
+    return { { "status", "success" } };
 }

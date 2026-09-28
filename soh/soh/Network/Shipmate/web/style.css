@@ -22,9 +22,22 @@ body {
         flex-shrink: 0;
     }
 
+#status, #message {
+    text-align: center;
+    font-size: 13px;
+    margin: 8px 0;
+}
+
+    #status:empty, #message:empty {
+        display: none;
+    }
+
 #status {
     color: #b8c2b4;
-    font-size: 13px;
+}
+
+#message, #asset-warning {
+    color: #f0d475;
 }
 
 button {
@@ -40,11 +53,6 @@ button {
     button:disabled {
         cursor: default;
         opacity: .5;
-    }
-
-    button[aria-pressed="true"] {
-        border-color: #e5cd77;
-        background: #424331;
     }
 
     button:focus-visible {
@@ -175,7 +183,6 @@ button {
 }
 
 .assignment[aria-pressed="true"] {
-    background: transparent;
     outline: 2px solid #fff2a9;
     outline-offset: 3px;
     filter: drop-shadow(0 0 4px #d6b956);
@@ -183,11 +190,6 @@ button {
 
 .assignment:hover:not(:disabled):not(.readonly) {
     filter: brightness(1.2);
-}
-
-.assignment:focus-visible {
-    outline: 2px solid #fff2a9;
-    outline-offset: 3px;
 }
 
 .hud-ammo {
@@ -206,9 +208,19 @@ button {
         image-rendering: pixelated;
     }
 
-#message {
-    color: #f0d475;
+/* Fit the 3:2 panel into the space left after HUD/status controls, reserving
+   53px for the caption and Z/R tabs. */
+#panels {
+    margin: 0;
+    flex: 1;
+    min-height: 0;
+    container-type: size;
 }
+
+    #panels > section {
+        width: min(100cqw, max(0px, calc((100cqh - 53px) * 1.5)));
+        margin-inline: auto;
+    }
 
 #panels[data-view="items"] #equipment-panel, #panels[data-view="equipment"] #items-panel {
     display: none;
@@ -221,14 +233,6 @@ button {
     image-rendering: pixelated;
     container-type: inline-size;
 }
-
-    .pause-panel.items {
-        background-image: url('/assets/items.png');
-    }
-
-    .pause-panel.equipment {
-        background-image: url('/assets/equipment.png');
-    }
 
 .slot {
     position: absolute;
@@ -258,13 +262,9 @@ button {
         filter: grayscale(1) brightness(.5);
     }
 
-    .slot[aria-pressed="true"] {
-        background: transparent;
+    .slot:hover:not(:disabled) img.icon, .slot[aria-pressed="true"] img.icon {
+        transform: scale(1.12);
     }
-
-        .slot:hover:not(:disabled) img.icon, .slot[aria-pressed="true"] img.icon {
-            transform: scale(1.12);
-        }
 
     .slot .equipped {
         position: absolute;
@@ -367,10 +367,9 @@ button {
     border-radius: 14px;
     color: #fff;
     text-shadow: 1px 2px #000;
-}
-
-#asset-warning {
-    color: #f0d475;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 @media (max-width: 760px) {
@@ -379,48 +378,9 @@ button {
     }
 }
 
-#status, #message {
-    text-align: center;
-    font-size: 13px;
-    margin: 8px 0;
-}
-
-    #status:empty, #message:empty {
-        display: none;
-    }
-
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
-
 #unassign {
     display: block;
     margin: 0 auto 12px;
-}
-/* Fit the 3:2 panel into the space left after HUD/status controls, reserving
-   53px for the caption and Z/R tabs. */
-#panels {
-    margin: 0;
-    flex: 1;
-    min-height: 0;
-    container-type: size;
-}
-
-    #panels > section {
-        width: min(100cqw, max(0px, calc((100cqh - 53px) * 1.5)));
-        margin-inline: auto;
-    }
-
-.caption {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .panel-footer {
@@ -446,12 +406,10 @@ button {
 
     .page-switch.left {
         grid-column: 1;
-        background-image: url('/assets/gLButtonTex.png');
     }
 
     .page-switch.right {
         grid-column: 3;
-        background-image: url('/assets/gRButtonTex.png');
     }
 
     .page-switch:hover {

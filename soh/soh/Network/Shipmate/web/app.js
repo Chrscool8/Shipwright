@@ -6,9 +6,8 @@ let state = null,
     busy = false,
     previous = '';
 
-function button(text, disabled, action) {
+function button(disabled, action) {
     const b = document.createElement('button');
-    b.textContent = text;
     b.disabled = disabled;
     b.onclick = action;
     return b;
@@ -54,7 +53,7 @@ function chooseButton(index) {
 
 function icon(asset) {
     const img = document.createElement('img');
-    img.src = `/assets/${asset}.png?v=${state?.assetRevision ?? 0}`;
+    img.src = `/assets/${asset}.png?v=${state.assetRevision}`;
     img.alt = '';
     img.className = 'icon';
     img.draggable = false;
@@ -113,24 +112,16 @@ function appendAmmo(element, entry, className) {
     element.setAttribute('aria-label', `${element.title}, ${entry.ammo}`);
 }
 
-function render() {
-    for (const id of ['buttons', 'inventory', 'gear', 'worn']) el(id).replaceChildren();
-    el('unassign').hidden = true;
-    el('item-name').textContent = 'Select Item';
-    el('gear-name').textContent = 'Equipment';
-    if (!state?.loaded) {
-        selected = selectedButton = null;
-        el('selection').textContent = 'Load a save in Ship.';
-        return;
-    }
+function updateSelection() {
     if (selected && (selected.fileNum !== state.fileNum || selected.age !== state.age ||
             state.items[selected.slot]?.item !== selected.item)) selected = null;
     const selectedEntry = selectedButton ? state.buttons[selectedButton.button + 1] : null;
     if (selectedButton && (selectedButton.fileNum !== state.fileNum || selectedButton.age !== state.age ||
             !selectedEntry?.allowed || selectedEntry.item !== selectedButton.item ||
             selectedEntry.slot !== selectedButton.slot)) selectedButton = null;
-    const enabled = state.canChange && !busy;
-    el('selection').textContent = selected ? `Selected: ${state.items[selected.slot].name}. Choose a button above.` : selectedButton ? `Selected: ${labels[selectedButton.button]}. Choose an item or Unassign. Click again to cancel.` : 'Select an item and a button, in either order.';
+}
+
+function renderButtons(enabled) {
     const cButtons = document.createElement('div');
     cButtons.className = 'hud-c-buttons';
     const dpad = document.createElement('div');
@@ -143,9 +134,19 @@ function render() {
     for (const entry of state.buttons) {
         const i = entry.button;
         const label = i < 0 ? 'B' : labels[i];
-        const b = i < 0 ? document.createElement('div') : button('', !enabled || !entry.allowed ||
+        const b = i < 0 ? document.createElement('div') : button(!enabled || !entry.allowed ||
             (selected && !state.items[selected.slot].allowed), () => chooseButton(i));
-        b.className = `assignment ${i < 0 ? 'hud-b readonly' : i < 3 ? `hud-c ${positions[i]}` : `hud-direction ${positions[i]}`}`;
+        let parent;
+        if (i < 0) {
+            b.className = 'assignment hud-b readonly';
+            parent = el('buttons');
+        } else if (i < 3) {
+            b.className = `assignment hud-c ${positions[i]}`;
+            parent = cButtons;
+        } else {
+            b.className = `assignment hud-direction ${positions[i]}`;
+            parent = dpad;
+        }
         b.title = `${label}: ${entry.name}`;
         b.setAttribute('aria-label', b.title);
         if (i >= 0) b.setAttribute('aria-pressed', String(selectedButton?.button === i));
@@ -167,19 +168,23 @@ function render() {
             arrow.className = 'empty-c-arrow';
             b.append(arrow);
         }
-        (i < 0 ? el('buttons') : i < 3 ? cButtons : dpad).append(b);
+        parent.append(b);
     }
     if (selectedButton) {
+        const selectedEntry = state.buttons[selectedButton.button + 1];
         el('unassign').hidden = false;
         el('unassign').textContent = `Unassign ${labels[selectedButton.button]}`;
         el('unassign').disabled = !enabled || selectedEntry.empty;
         el('unassign').onclick = () => change({ action: 'unassign', ...selectedButton });
     }
+}
+
+function renderInventory(enabled) {
     // Original pause geometry: 28px icons, 32px spacing, six columns by four rows.
     for (const entry of state.items) {
         if (entry.empty) continue;
         const slot = entry.slot;
-        const b = button('', !entry.allowed || !enabled, () => chooseItem(slot, entry.item));
+        const b = button(!entry.allowed || !enabled, () => chooseItem(slot, entry.item));
         decorateSlot(b, entry, 26 + (slot % 6) * 32, 24 + Math.floor(slot / 6) * 32);
         b.classList.toggle('restricted', !entry.allowed);
         b.setAttribute('aria-pressed', String(selected?.slot === slot));
@@ -188,8 +193,11 @@ function render() {
         el('inventory').append(b);
     }
     if (selected) el('item-name').textContent = state.items[selected.slot].name;
+}
+
+function renderEquipment(enabled) {
     for (const entry of state.equipment) {
-        const b = button('', !enabled || !entry.allowed, () => change({
+        const b = button(!enabled || !entry.allowed, () => change({
             action: 'equip',
             category: entry.category,
             value: entry.value,
@@ -210,6 +218,9 @@ function render() {
         showCaption(b, 'gear-name', entry.name);
         el('gear').append(b);
     }
+}
+
+function renderWorn() {
     const heading = document.createElement('div');
     heading.className = 'worn-title';
     heading.textContent = 'EQUIPPED';
@@ -223,6 +234,23 @@ function render() {
         row.append(text);
         el('worn').append(row);
     }
+}
+
+function render() {
+    for (const id of ['buttons', 'inventory', 'gear', 'worn']) el(id).replaceChildren();
+    el('unassign').hidden = true;
+    el('item-name').textContent = 'Select Item';
+    el('gear-name').textContent = 'Equipment';
+    if (!state?.loaded) {
+        selected = selectedButton = null;
+        return;
+    }
+    updateSelection();
+    const enabled = state.canChange && !busy;
+    renderButtons(enabled);
+    renderInventory(enabled);
+    renderEquipment(enabled);
+    renderWorn();
 }
 
 function setView(view) {
@@ -294,7 +322,7 @@ async function change(payload) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ ...payload, schemaVersion: 2 })
+            body: JSON.stringify(payload)
         });
         el('message').textContent = data.status === 'success' ? '' : data.message ?? data.status;
         if (data.status === 'success') selected = selectedButton = null;
