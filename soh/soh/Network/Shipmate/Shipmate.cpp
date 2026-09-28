@@ -21,17 +21,18 @@
 
 namespace Shipmate {
 namespace {
-constexpr int Port = 43385;
 std::unique_ptr<httplib::Server> server;
 std::thread listener;
 std::string error;
 struct Job {
     std::function<void()> run;
+    std::function<void()> cancel;
     enum class State { Pending, Running, Cancelled };
     std::atomic<State> state{ State::Pending };
 };
 std::mutex jobsMutex;
 std::deque<std::shared_ptr<Job>> jobs;
+std::atomic<bool> jobsPending = false;
 bool accepting = false;
 std::mutex imagesMutex;
 std::unordered_map<std::string, std::string> images;
@@ -48,11 +49,15 @@ template <typename F> auto OnGameThread(F fn) -> decltype(fn()) {
             promise->set_value(fn());
         } catch (...) { promise->set_exception(std::current_exception()); }
     };
+    job->cancel = [promise] {
+        promise->set_exception(std::make_exception_ptr(std::runtime_error("Shipmate was disabled")));
+    };
     {
         std::lock_guard lock(jobsMutex);
         if (!accepting || jobs.size() >= 64)
             throw std::runtime_error("Shipmate is busy or disabled");
         jobs.push_back(job);
+        jobsPending.store(true, std::memory_order_release);
     }
     if (result.wait_for(std::chrono::seconds(2)) != std::future_status::ready) {
         auto pending = Job::State::Pending;
@@ -65,13 +70,20 @@ template <typename F> auto OnGameThread(F fn) -> decltype(fn()) {
 }
 void RegisterHooks() {
     COND_HOOK(OnGameFrameUpdate, IsEnabled(), [] {
+        if (!jobsPending.load(std::memory_order_acquire))
+            return;
         std::shared_ptr<Job> job;
         {
             std::unique_lock lock(jobsMutex, std::try_to_lock);
-            if (!lock.owns_lock() || jobs.empty())
+            if (!lock.owns_lock())
                 return;
+            if (jobs.empty()) {
+                jobsPending.store(false, std::memory_order_release);
+                return;
+            }
             job = jobs.front();
             jobs.pop_front();
+            jobsPending.store(!jobs.empty(), std::memory_order_release);
         }
         // One small snapshot/action/context capture per frame, outside the queue lock.
         // If a worker owns the queue, gameplay skips it and Shipmate waits.
@@ -102,12 +114,17 @@ const std::string& Error() {
     return error;
 }
 void Disable() {
+    std::deque<std::shared_ptr<Job>> cancelled;
     {
         std::lock_guard lock(jobsMutex);
         accepting = false;
-        for (auto& job : jobs)
-            job->state = Job::State::Cancelled;
-        jobs.clear();
+        cancelled.swap(jobs);
+        jobsPending.store(false, std::memory_order_release);
+    }
+    for (auto& job : cancelled) {
+        auto pending = Job::State::Pending;
+        if (job->state.compare_exchange_strong(pending, Job::State::Cancelled))
+            job->cancel();
     }
     if (server) {
         server->stop();
@@ -119,12 +136,16 @@ void Disable() {
     std::lock_guard lock(imagesMutex);
     images.clear();
 }
-bool Enable(bool lan) {
+bool Enable(bool lan, int port) {
     Disable();
     error.clear();
+    if (port < 1 || port > 65535) {
+        error = "Shipmate port must be between 1 and 65535.";
+        return false;
+    }
     InvalidateAssets();
     auto next = std::make_unique<httplib::Server>();
-    next->new_task_queue = [] { return new httplib::ThreadPool(4); };
+    next->new_task_queue = [] { return new httplib::ThreadPool(4, 16); };
     // A few idle browser sockets must not occupy the whole small worker pool.
     next->set_keep_alive_max_count(1);
     next->set_payload_max_length(4096);
@@ -134,15 +155,20 @@ bool Enable(bool lan) {
                                 { "Content-Security-Policy", "frame-ancestors 'none'" },
                                 { "X-Content-Type-Options", "nosniff" },
                                 { "X-Frame-Options", "DENY" } });
-    next->set_pre_routing_handler([](const auto& request, auto& response) {
+    next->set_pre_routing_handler([port](const auto& request, auto& response) {
         // Browser origin checks, without pairing or credentials.
         const auto host = request.get_header_value("Host");
         const auto origin = request.get_header_value("Origin");
-        const auto suffix = std::string(":") + std::to_string(Port);
-        auto address = host.ends_with(suffix) ? host.substr(0, host.size() - suffix.size()) : std::string();
+        const auto suffix = std::string(":") + std::to_string(port);
+        // HTTP's default port may be omitted from Host and Origin independently.
+        auto address = host.ends_with(suffix) ? host.substr(0, host.size() - suffix.size())
+                                             : (port == 80 ? host : std::string());
+        const auto expectedOrigin = "http://" + address + (port == 80 ? std::string() : suffix);
+        const bool sameOrigin = origin.empty() || origin == expectedOrigin ||
+                                (port == 80 && origin == expectedOrigin + suffix);
         in_addr numericAddress{};
         bool knownHost = address == "localhost" || inet_pton(AF_INET, address.c_str(), &numericAddress) == 1;
-        if (!knownHost || (!origin.empty() && origin != "http://" + host) ||
+        if (!knownHost || !sameOrigin ||
             request.get_header_value("Sec-Fetch-Site") == "cross-site") {
             response.status = 403;
             Json(response, { { "status", "failure" }, { "message", "Unrecognized browser origin" } });
@@ -227,8 +253,8 @@ bool Enable(bool lan) {
         }
         Png(r, request, png, revision);
     });
-    if (!next->bind_to_port(lan ? "0.0.0.0" : "127.0.0.1", Port)) {
-        error = "Cannot open port 43385. Close the old helper or another Ship instance.";
+    if (!next->bind_to_port(lan ? "0.0.0.0" : "127.0.0.1", port)) {
+        error = "Cannot open port " + std::to_string(port) + ". Close the old helper or another Ship instance.";
         return false;
     }
     server = std::move(next);
@@ -242,7 +268,9 @@ bool Enable(bool lan) {
     return true;
 }
 static RegisterShipInitFunc init([] {
-    if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0) && !Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0))) {
+    if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0) &&
+        !Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
+                CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385))) {
         CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
     }
 });

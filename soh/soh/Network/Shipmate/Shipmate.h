@@ -10,7 +10,7 @@ class ResourceManager;
 }
 
 namespace Shipmate {
-bool Enable(bool lan);
+bool Enable(bool lan, int port);
 void Disable();
 bool IsEnabled();
 const std::string& Error();
