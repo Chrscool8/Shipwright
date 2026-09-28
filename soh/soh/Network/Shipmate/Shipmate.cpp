@@ -278,12 +278,6 @@ bool Enable(bool lan, int port) {
             Json(r, { { "status", "failure" }, { "message", "Expected an inventory/equipment action" } });
             return;
         }
-        auto action = payload["action"].template get<std::string>();
-        if (action != "assign" && action != "unassign" && action != "equip") {
-            r.status = 400;
-            Json(r, { { "status", "failure" }, { "message", "Unknown action" } });
-            return;
-        }
         Json(r, OnGameThread([payload] {
                  try {
                      return HandleRequest(payload);
@@ -297,7 +291,7 @@ bool Enable(bool lan, int port) {
         auto revision = AssetRevision();
         {
             std::lock_guard lock(imagesMutex);
-            if ((!request.has_param("v") || MatchesRevision(request, revision)) && imageGeneration == revision) {
+            if (imageGeneration == revision) {
                 if (auto it = images.find(name); it != images.end()) {
                     Png(r, request, it->second, revision);
                     return;

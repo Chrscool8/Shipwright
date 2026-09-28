@@ -66,7 +66,7 @@ static Image Texture(const std::string& name, const AssetContext& context) {
     if (name.starts_with("item-")) {
         path = context.itemIconPath;
     } else if (auto entry = AssetPaths.find(name); entry != AssetPaths.end()) {
-        path = entry->second.substr(7);
+        path = entry->second;
     }
     if (path.empty()) {
         return {};
