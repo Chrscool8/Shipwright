@@ -14,11 +14,14 @@ bool Enable(bool lan, int port);
 void Disable();
 bool IsEnabled();
 const std::string& Error();
-// The following functions are called only on the game thread.
+// Game-thread request handling and cosmetic reads.
 nlohmann::json HandleRequest(const nlohmann::json& request);
 nlohmann::json HudColors();
+
+// Atomic revision reads are also safe on HTTP workers; invalidation runs on the game thread.
 uint64_t AssetRevision();
 void InvalidateAssets();
+
 // Capture only the manager lifetime and asset selection on the game thread.
 struct AssetContext {
     std::shared_ptr<Ship::ResourceManager> manager;
@@ -26,6 +29,7 @@ struct AssetContext {
     uint64_t revision;
 };
 AssetContext CaptureAssets();
+
 // Resource waits, pixel conversion/compositing and encoding belong to HTTP workers.
 struct Image {
     int width = 0, height = 0;

@@ -47,36 +47,43 @@ template <typename F> auto OnGameThread(F fn) -> decltype(fn()) {
     job->run = [promise, fn] {
         try {
             promise->set_value(fn());
-        } catch (...) { promise->set_exception(std::current_exception()); }
+        } catch (...) {
+            promise->set_exception(std::current_exception());
+        }
     };
     job->cancel = [promise] {
         promise->set_exception(std::make_exception_ptr(std::runtime_error("Shipmate was disabled")));
     };
     {
         std::lock_guard lock(jobsMutex);
-        if (!accepting || jobs.size() >= 64)
+        if (!accepting || jobs.size() >= 64) {
             throw std::runtime_error("Shipmate is busy or disabled");
+        }
         jobs.push_back(job);
         jobsPending.store(true, std::memory_order_release);
     }
     if (result.wait_for(std::chrono::seconds(2)) != std::future_status::ready) {
         auto pending = Job::State::Pending;
-        if (job->state.compare_exchange_strong(pending, Job::State::Cancelled) || pending == Job::State::Cancelled)
+        if (job->state.compare_exchange_strong(pending, Job::State::Cancelled) || pending == Job::State::Cancelled) {
             throw std::runtime_error("Ship is not responding; try again when the game is running");
+        }
         // A short game action already claimed this request. Return its actual result;
         // never report a timeout and then apply an equipment change later.
     }
     return result.get();
 }
+
 void RegisterHooks() {
     COND_HOOK(OnGameFrameUpdate, IsEnabled(), [] {
-        if (!jobsPending.load(std::memory_order_acquire))
+        if (!jobsPending.load(std::memory_order_acquire)) {
             return;
+        }
         std::shared_ptr<Job> job;
         {
             std::unique_lock lock(jobsMutex, std::try_to_lock);
-            if (!lock.owns_lock())
+            if (!lock.owns_lock()) {
                 return;
+            }
             if (jobs.empty()) {
                 jobsPending.store(false, std::memory_order_release);
                 return;
@@ -88,17 +95,21 @@ void RegisterHooks() {
         // One small snapshot/action/context capture per frame, outside the queue lock.
         // If a worker owns the queue, gameplay skips it and Shipmate waits.
         auto pending = Job::State::Pending;
-        if (job->state.compare_exchange_strong(pending, Job::State::Running))
+        if (job->state.compare_exchange_strong(pending, Job::State::Running)) {
             job->run();
+        }
     });
     COND_HOOK(OnAssetAltChange, IsEnabled(), [] { InvalidateAssets(); });
 }
+
 void Json(httplib::Response& response, const nlohmann::json& value) {
     response.set_content(value.dump(), "application/json");
 }
+
 bool MatchesRevision(const httplib::Request& request, uint64_t revision) {
     return request.has_param("v") && request.get_param_value("v") == std::to_string(revision);
 }
+
 void Png(httplib::Response& response, const httplib::Request& request, const std::string& png, uint64_t revision) {
     response.set_content(png, "image/png");
     if (MatchesRevision(request, revision)) {
@@ -110,9 +121,11 @@ void Png(httplib::Response& response, const httplib::Request& request, const std
 bool IsEnabled() {
     return server != nullptr;
 }
+
 const std::string& Error() {
     return error;
 }
+
 void Disable() {
     std::deque<std::shared_ptr<Job>> cancelled;
     {
@@ -123,19 +136,22 @@ void Disable() {
     }
     for (auto& job : cancelled) {
         auto pending = Job::State::Pending;
-        if (job->state.compare_exchange_strong(pending, Job::State::Cancelled))
+        if (job->state.compare_exchange_strong(pending, Job::State::Cancelled)) {
             job->cancel();
+        }
     }
     if (server) {
         server->stop();
-        if (listener.joinable())
+        if (listener.joinable()) {
             listener.join();
+        }
         server.reset();
     }
     RegisterHooks();
     std::lock_guard lock(imagesMutex);
     images.clear();
 }
+
 bool Enable(bool lan, int port) {
     Disable();
     error.clear();
@@ -161,15 +177,14 @@ bool Enable(bool lan, int port) {
         const auto origin = request.get_header_value("Origin");
         const auto suffix = std::string(":") + std::to_string(port);
         // HTTP's default port may be omitted from Host and Origin independently.
-        auto address = host.ends_with(suffix) ? host.substr(0, host.size() - suffix.size())
-                                             : (port == 80 ? host : std::string());
+        auto address =
+            host.ends_with(suffix) ? host.substr(0, host.size() - suffix.size()) : (port == 80 ? host : std::string());
         const auto expectedOrigin = "http://" + address + (port == 80 ? std::string() : suffix);
-        const bool sameOrigin = origin.empty() || origin == expectedOrigin ||
-                                (port == 80 && origin == expectedOrigin + suffix);
+        const bool sameOrigin =
+            origin.empty() || origin == expectedOrigin || (port == 80 && origin == expectedOrigin + suffix);
         in_addr numericAddress{};
         bool knownHost = address == "localhost" || inet_pton(AF_INET, address.c_str(), &numericAddress) == 1;
-        if (!knownHost || !sameOrigin ||
-            request.get_header_value("Sec-Fetch-Site") == "cross-site") {
+        if (!knownHost || !sameOrigin || request.get_header_value("Sec-Fetch-Site") == "cross-site") {
             response.status = 403;
             Json(response, { { "status", "failure" }, { "message", "Unrecognized browser origin" } });
             return httplib::Server::HandlerResponse::Handled;
@@ -179,9 +194,12 @@ bool Enable(bool lan, int port) {
     next->set_exception_handler([](const auto&, auto& response, std::exception_ptr exception) {
         std::string message = "Shipmate request failed";
         try {
-            if (exception)
+            if (exception) {
                 std::rethrow_exception(exception);
-        } catch (const std::exception& e) { message = e.what(); } catch (...) {
+            }
+        } catch (const std::exception& e) {
+            message = e.what();
+        } catch (...) {
         }
         response.status = 503;
         Json(response, { { "status", "failure" }, { "message", message } });
@@ -248,8 +266,9 @@ bool Enable(bool lan, int port) {
         auto png = EncodePng(image);
         {
             std::lock_guard lock(imagesMutex);
-            if (imageGeneration == revision)
+            if (imageGeneration == revision) {
                 images[name] = png;
+            }
         }
         Png(r, request, png, revision);
     });
@@ -267,10 +286,10 @@ bool Enable(bool lan, int port) {
     server->wait_until_ready();
     return true;
 }
+
 static RegisterShipInitFunc init([] {
     if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0) &&
-        !Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
-                CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385))) {
+        !Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0), CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), 43385))) {
         CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
     }
 });

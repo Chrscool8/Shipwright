@@ -314,7 +314,8 @@ async function refresh() {
             el('asset-warning').hidden = true;
         }
         updateColors(next?.colors);
-        const signature = JSON.stringify(next);
+        // Color filters update independently; rainbow changes should not rebuild the controls.
+        const signature = JSON.stringify(next ? { ...next, colors: undefined } : null);
         state = next;
         if (signature !== previous) {
             previous = signature;

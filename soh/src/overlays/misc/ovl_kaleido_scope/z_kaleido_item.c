@@ -866,8 +866,7 @@ static s16 sCButtonPosY[] = { 110, 92, 110, 76, 44, 62, 62 };
 void KaleidoScope_AssignItemToButton(PlayState* play, u16 item, u16 slot, u16 button) {
     // Skipping the arrow animation: need to change the item's type and
     // slot when it hits the button since it didn't get set earlier
-    if (item == ITEM_ARROW_FIRE || item == ITEM_ARROW_ICE ||
-        item == ITEM_ARROW_LIGHT) {
+    if (item == ITEM_ARROW_FIRE || item == ITEM_ARROW_ICE || item == ITEM_ARROW_LIGHT) {
         switch (item) {
             case ITEM_ARROW_FIRE:
                 item = ITEM_BOW_ARROW_FIRE;
@@ -896,10 +895,8 @@ void KaleidoScope_AssignItemToButton(PlayState* play, u16 item, u16 slot, u16 bu
         if (slot == gSaveContext.equips.cButtonSlots[otherSlotIndex]) {
             // Assign the other button to the target's current item
             if (gSaveContext.equips.buttonItems[targetButtonIndex] != ITEM_NONE) {
-                gSaveContext.equips.buttonItems[otherButtonIndex] =
-                    gSaveContext.equips.buttonItems[targetButtonIndex];
-                gSaveContext.equips.cButtonSlots[otherSlotIndex] =
-                    gSaveContext.equips.cButtonSlots[button];
+                gSaveContext.equips.buttonItems[otherButtonIndex] = gSaveContext.equips.buttonItems[targetButtonIndex];
+                gSaveContext.equips.cButtonSlots[otherSlotIndex] = gSaveContext.equips.cButtonSlots[button];
                 Interface_LoadItemIcon2(play, otherButtonIndex);
             } else {
                 gSaveContext.equips.buttonItems[otherButtonIndex] = ITEM_NONE;
@@ -913,10 +910,8 @@ void KaleidoScope_AssignItemToButton(PlayState* play, u16 item, u16 slot, u16 bu
             if (gSaveContext.equips.buttonItems[otherButtonIndex] >= ITEM_BOW_ARROW_FIRE &&
                 gSaveContext.equips.buttonItems[otherButtonIndex] <= ITEM_BOW_ARROW_LIGHT &&
                 !CVarGetInteger(CVAR_ENHANCEMENT("SeparateArrows"), 0)) {
-                gSaveContext.equips.buttonItems[otherButtonIndex] =
-                    gSaveContext.equips.buttonItems[targetButtonIndex];
-                gSaveContext.equips.cButtonSlots[otherSlotIndex] =
-                    gSaveContext.equips.cButtonSlots[button];
+                gSaveContext.equips.buttonItems[otherButtonIndex] = gSaveContext.equips.buttonItems[targetButtonIndex];
+                gSaveContext.equips.cButtonSlots[otherSlotIndex] = gSaveContext.equips.cButtonSlots[button];
                 Interface_LoadItemIcon2(play, otherButtonIndex);
             }
         }
