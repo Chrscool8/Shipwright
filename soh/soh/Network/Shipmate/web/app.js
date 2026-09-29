@@ -361,8 +361,20 @@ async function change(payload) {
         render();
     }
 }
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+let polling = false;
+// Hidden tabs stop polling, sparing the game thread and phone battery; showing the tab resumes.
 async function poll() {
-    if (!busy) await refresh();
-    setTimeout(poll, 250);
+    if (polling) return;
+    polling = true;
+    try {
+        while (!document.hidden) {
+            if (!busy) await refresh();
+            await sleep(250);
+        }
+    } finally {
+        polling = false;
+    }
 }
+document.addEventListener('visibilitychange', poll);
 poll();

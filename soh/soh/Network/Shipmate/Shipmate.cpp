@@ -149,7 +149,8 @@ std::deque<std::shared_ptr<Job>> jobs;
 std::atomic<bool> jobsPending = false;
 bool accepting = false;
 std::mutex imagesMutex;
-std::unordered_map<std::string, std::string> images;
+// PNGs for imageGeneration; each entry is shared by requests while its first request encodes it.
+std::unordered_map<std::string, std::shared_future<std::string>> images;
 uint64_t imageGeneration = 0;
 
 // Timeout cancels a job before it can make a delayed equipment change.
@@ -288,9 +289,11 @@ bool Enable(bool lan, int port) {
     }
     InvalidateAssets();
     auto next = std::make_unique<httplib::Server>();
-    next->new_task_queue = [] { return new httplib::ThreadPool(4, 16); };
-    // Prevent idle connections from occupying all workers.
-    next->set_keep_alive_max_count(1);
+    // Each open keep-alive connection holds a worker; a browser opens up to six per host.
+    next->new_task_queue = [] { return new httplib::ThreadPool(8, 32); };
+    // Reuse connections for 250 ms polling, but release idle ones quickly.
+    next->set_keep_alive_max_count(100);
+    next->set_keep_alive_timeout(1);
     next->set_payload_max_length(4096);
     next->set_read_timeout(2, 0);
     next->set_write_timeout(2, 0);
@@ -352,41 +355,58 @@ bool Enable(bool lan, int port) {
     });
     next->Get(R"(/assets/([A-Za-z0-9_-]+)\.png)", [](const auto& request, auto& r) {
         const std::string name = request.matches[1];
-        auto revision = AssetRevision();
+        // Assets never touch the game thread, so a busy frame cannot fail an icon request.
+        const auto context = CaptureAssets(name);
+        const auto revision = context.revision;
+        // Waiting for resources and all image processing stay on this HTTP worker.
+        auto render = [&] {
+            auto image = ReadAsset(name, context);
+            return image.rgba.empty() ? std::string() : EncodePng(image);
+        };
+        std::shared_future<std::string> cached;
+        std::promise<std::string> result;
+        bool owner = false;
         {
             std::lock_guard lock(imagesMutex);
-            if (imageGeneration == revision) {
-                if (auto it = images.find(name); it != images.end()) {
-                    Png(r, request, it->second, revision);
-                    return;
-                }
-            }
-        }
-        auto context = OnGameThread([name] { return CaptureAssets(name); });
-        revision = context.revision;
-        {
-            std::lock_guard lock(imagesMutex);
-            if (imageGeneration != revision) {
+            // Revisions only grow; a slower request for an older one must not rewind the cache.
+            if (revision > imageGeneration) {
                 images.clear();
                 imageGeneration = revision;
             }
-            if (auto it = images.find(name); it != images.end()) {
-                Png(r, request, it->second, revision);
-                return;
+            if (revision == imageGeneration) {
+                // Concurrent misses share one decode instead of each converting the texture.
+                auto [it, inserted] = images.try_emplace(name);
+                if (inserted) {
+                    it->second = result.get_future().share();
+                    owner = true;
+                }
+                cached = it->second;
             }
         }
-        // Waiting for resources and all image processing stay on this HTTP worker.
-        auto image = ReadAsset(name, context);
-        if (image.rgba.empty()) {
+        std::string png;
+        if (!cached.valid()) {
+            png = render(); // Stale revision: serve it without touching the current cache.
+        } else {
+            if (owner) {
+                bool keep = false;
+                try {
+                    auto value = render();
+                    keep = !value.empty();
+                    result.set_value(std::move(value));
+                } catch (...) { result.set_exception(std::current_exception()); }
+                // Drop failures so a retry tries again, and misses so arbitrary names cannot grow the cache.
+                if (!keep) {
+                    std::lock_guard lock(imagesMutex);
+                    if (imageGeneration == revision) {
+                        images.erase(name);
+                    }
+                }
+            }
+            png = cached.get(); // Rethrows a failed decode for the 503 exception handler.
+        }
+        if (png.empty()) {
             r.status = 404;
             return;
-        }
-        auto png = EncodePng(image);
-        {
-            std::lock_guard lock(imagesMutex);
-            if (imageGeneration == revision) {
-                images[name] = png;
-            }
         }
         Png(r, request, png, revision);
     });

@@ -8,23 +8,31 @@
 #include <stb_image_write.h>
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <chrono>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <mutex>
 #include <stdexcept>
 
 namespace Shipmate {
-static std::atomic<uint64_t> revision{ static_cast<uint64_t>(
-    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count()) };
+// The alternate-assets flag changes only on the game thread, just before OnAssetAltChange invalidates.
+// Recording it with the revision lets HTTP workers capture a consistent pair without a game-thread hop.
+static std::mutex revisionMutex;
+static uint64_t revision = static_cast<uint64_t>(
+    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+static bool alternate = false;
+
 uint64_t AssetRevision() {
-    return revision.load(std::memory_order_relaxed);
+    std::lock_guard lock(revisionMutex);
+    return revision;
 }
 
 void InvalidateAssets() {
-    revision.fetch_add(1, std::memory_order_relaxed);
+    const bool enabled = Ship::Context::GetRawInstance()->GetResourceManager()->IsAltAssetsEnabled();
+    std::lock_guard lock(revisionMutex);
+    alternate = enabled;
+    ++revision;
 }
 
 static std::array<int, 3> Color(const char* key, std::array<int, 3> fallback) {
@@ -49,8 +57,12 @@ nlohmann::json HudColors() {
 }
 
 AssetContext CaptureAssets(const std::string& name) {
-    auto manager = Ship::Context::GetRawInstance()->GetResourceManager();
-    AssetContext context{ manager, manager->IsAltAssetsEnabled(), AssetRevision(), {} };
+    AssetContext context{ Ship::Context::GetRawInstance()->GetResourceManager(), false, 0, {} };
+    {
+        std::lock_guard lock(revisionMutex);
+        context.alternate = alternate;
+        context.revision = revision;
+    }
     if (name.starts_with("item-")) {
         int item;
         auto [end, error] = std::from_chars(name.data() + 5, name.data() + name.size(), item);

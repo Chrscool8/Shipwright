@@ -24,11 +24,13 @@ nlohmann::json HandleRequest(const nlohmann::json& request);
 nlohmann::json HudColors();
 std::string ItemIconPath(int item);
 
-// Atomic revision reads are also safe on HTTP workers; invalidation runs on the game thread.
+// Revision reads are safe on HTTP workers; invalidation runs on the game thread and records
+// the alternate-assets flag alongside the new revision.
 uint64_t AssetRevision();
 void InvalidateAssets();
 
-// Capture the manager lifetime, asset selection, and requested item path on the game thread.
+// Capture the manager lifetime, asset selection, and requested item path. Safe on HTTP workers
+// while Shipmate is enabled (Disable joins them before shutdown releases the manager).
 struct AssetContext {
     std::shared_ptr<Ship::ResourceManager> manager;
     bool alternate;
