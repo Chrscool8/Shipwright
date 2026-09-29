@@ -104,14 +104,14 @@ static Image LoadTexture(const std::string& path, const AssetContext& context) {
     // Shared ownership pins the texture buffer through conversion, even across invalidation.
     auto resource = std::dynamic_pointer_cast<Fast::Texture>(loaded);
     if (!resource || !resource->ImageData) {
-        throw AssetError("Texture unavailable: " + path);
+        throw std::runtime_error("Texture unavailable: " + path);
     }
     Image result;
     result.width = resource->Width;
     result.height = resource->Height;
     size_t count = size_t(result.width) * result.height;
     if (!count || count > 4096 * 4096) {
-        throw AssetError("Unsupported texture dimensions: " + path);
+        throw std::runtime_error("Unsupported texture dimensions: " + path);
     }
     auto type = resource->Type;
     using T = Fast::TextureType;
@@ -139,10 +139,10 @@ static Image LoadTexture(const std::string& path, const AssetContext& context) {
             bits = 4;
             break;
         default:
-            throw AssetError("Unsupported texture format: " + path);
+            throw std::runtime_error("Unsupported texture format: " + path);
     }
     if ((count * bits + 7) / 8 > resource->ImageDataSize) {
-        throw AssetError("Incomplete texture: " + path);
+        throw std::runtime_error("Incomplete texture: " + path);
     }
     result.rgba.resize(count * 4);
     const auto* data = resource->ImageData;
@@ -198,52 +198,41 @@ static Image Texture(const std::string& name, const AssetContext& context) {
     return path.empty() ? Image{} : LoadTexture(path, context);
 }
 
-// Column-major tiles; row 0 is the heading.
-constexpr int PageColumns = 3, PageRows = 5;
-
-// Requested language, then English; empty if neither exists.
-static Image PageTile(bool items, int language, int index, const AssetContext& context) {
-    for (int candidate : { language, int(LANGUAGE_ENG) }) {
-        auto* textures = KaleidoScope_GetPageTextures(items ? PAUSE_ITEM : PAUSE_EQUIP, candidate);
-        try {
-            return LoadTexture(StripOtrSignature(static_cast<const char*>(textures[index])), context);
-        } catch (const AssetError&) {}
-        if (candidate == LANGUAGE_ENG) {
-            break;
-        }
+Image ReadAsset(const std::string& name, const AssetContext& context) {
+    // Pause pages are "items-<language>" and "equipment-<language>".
+    int language;
+    const bool items = ParseIndexed(name, "items-", language);
+    if (!items && !ParseIndexed(name, "equipment-", language)) {
+        return Texture(name, context);
     }
-    return {};
-}
-
-// Missing tiles become a plain tinted band.
-static Image ComposePage(bool items, const std::array<Image, PageColumns * PageRows>& tiles, int firstRow, int rows) {
+    if (language >= LANGUAGE_MAX) {
+        return {};
+    }
+    // The pause menu's own tables, 3 columns of 5 rows.
+    void** pageTextures = KaleidoScope_GetPageTextures(items ? PAUSE_ITEM : PAUSE_EQUIP, language);
+    std::array<Image, 15> tiles;
     int scale = 1;
-    for (int col = 0; col < PageColumns; ++col) {
-        for (int row = firstRow; row < firstRow + rows; ++row) {
-            const auto& tile = tiles[col * PageRows + row];
-            scale = std::max({ scale, (tile.width + 79) / 80, (tile.height + 31) / 32 });
-        }
+    for (size_t i = 0; i < tiles.size(); ++i) {
+        auto& tile = tiles[i];
+        tile = LoadTexture(StripOtrSignature(static_cast<const char*>(pageTextures[i])), context);
+        scale = std::max({ scale, (tile.width + 79) / 80, (tile.height + 31) / 32 });
     }
     // Preserve HD tile detail, including packs that only replace some tiles.
     if (scale > 16) {
-        throw AssetError("Pause texture scale exceeds 16x");
+        throw std::runtime_error("Pause texture scale exceeds 16x");
     }
-    Image result{ 80 * PageColumns * scale, 32 * rows * scale, {} };
+    Image result{ 240 * scale, 160 * scale, {} };
     result.rgba.resize(size_t(result.width) * result.height * 4);
     const std::array<int, 3> edge = items ? std::array<int, 3>{ 10, 50, 80 } : std::array<int, 3>{ 10, 50, 40 };
     const std::array<int, 3> center = items ? std::array<int, 3>{ 70, 100, 130 } : std::array<int, 3>{ 90, 100, 60 };
-    constexpr unsigned char blank[] = { 255, 255, 255, 255 };
     for (int y = 0; y < result.height; ++y) {
         for (int x = 0; x < result.width; ++x) {
-            int col = x / (80 * scale), row = firstRow + y / (32 * scale);
-            const auto& tile = tiles[col * PageRows + row];
-            const unsigned char* src = blank;
-            if (!tile.rgba.empty()) {
-                int tx = (x % (80 * scale)) * tile.width / (80 * scale);
-                int ty = (y % (32 * scale)) * tile.height / (32 * scale);
-                src = &tile.rgba[(size_t(ty) * tile.width + tx) * 4];
-            }
+            int col = x / (80 * scale), row = y / (32 * scale);
+            const auto& tile = tiles[col * 5 + row];
+            int tx = (x % (80 * scale)) * tile.width / (80 * scale);
+            int ty = (y % (32 * scale)) * tile.height / (32 * scale);
             auto* dst = &result.rgba[(size_t(y) * result.width + x) * 4];
+            const auto* src = &tile.rgba[(size_t(ty) * tile.width + tx) * 4];
             double px = double(x) / scale;
             double mix = std::clamp(std::min(px / 80, (239 - px) / 80), 0.0, 1.0);
             for (int c = 0; c < 3; ++c) {
@@ -255,53 +244,13 @@ static Image ComposePage(bool items, const std::array<Image, PageColumns * PageR
     return result;
 }
 
-Image ReadAsset(const std::string& name, const AssetContext& context) {
-    struct Page {
-        std::string_view prefix;
-        bool items, title;
-    };
-    constexpr Page pages[] = { { "items-title-", true, true },
-                               { "equipment-title-", false, true },
-                               { "items-", true, false },
-                               { "equipment-", false, false } };
-    int language = -1;
-    const auto page = std::find_if(std::begin(pages), std::end(pages),
-                                   [&](const Page& p) { return ParseIndexed(name, p.prefix, language); });
-    if (page == std::end(pages)) {
-        return Texture(name, context);
-    }
-    if (language >= LANGUAGE_MAX) {
-        return {};
-    }
-    const bool items = page->items, title = page->title;
-    std::array<Image, PageColumns * PageRows> tiles;
-    const int firstRow = title ? 0 : 1, rows = title ? 1 : PageRows - 1;
-    bool any = false, all = true;
-    for (int col = 0; col < PageColumns; ++col) {
-        for (int row = firstRow; row < firstRow + rows; ++row) {
-            auto& tile = tiles[col * PageRows + row];
-            tile = PageTile(items, language, col * PageRows + row, context);
-            any |= !tile.rgba.empty();
-            all &= !tile.rgba.empty();
-        }
-    }
-    if (title) {
-        // All or nothing, so the page can fall back to a text heading.
-        return all ? ComposePage(items, tiles, 0, 1) : Image{};
-    }
-    if (!any) {
-        throw AssetError("Pause page textures unavailable");
-    }
-    return ComposePage(items, tiles, 0, PageRows);
-}
-
 std::string EncodePng(const Image& image) {
     std::string result;
     auto append = [](void* context, void* data, int size) {
         static_cast<std::string*>(context)->append(static_cast<const char*>(data), size);
     };
     if (!stbi_write_png_to_func(append, &result, image.width, image.height, 4, image.rgba.data(), image.width * 4)) {
-        throw AssetError("PNG encoding failed");
+        throw std::runtime_error("PNG encoding failed");
     }
     return result;
 }

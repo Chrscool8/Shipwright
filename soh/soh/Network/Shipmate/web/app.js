@@ -51,74 +51,25 @@ function chooseButton(index) {
     }
 }
 
-// Only transient failures retry; an <img> can't see the status, so ask with HEAD.
-async function transient(url) {
-    const status = await fetch(url, { method: 'HEAD' }).then(r => r.status, () => 0);
-    return status === 0 || status === 503 || (status >= 200 && status < 300);
-}
-
-function load(img, url, onFail, alive = () => true, attempt = 0) {
-    img.onerror = async () => {
-        if (!alive()) return;
-        if (attempt >= 3 || !(await transient(url))) return alive() && onFail();
-        setTimeout(() => {
-            if (alive()) load(img, url, onFail, alive, attempt + 1);
-        }, 500 * 2 ** attempt);
-    };
-    img.src = attempt ? `${url}&retry=${attempt}` : url;
-}
-
-function showAssetWarning() {
-    el('asset-warning').hidden = false;
-}
-
 function icon(asset) {
     const img = document.createElement('img');
+    img.src = `/assets/${asset}.png?v=${state.assetRevision}`;
     img.alt = '';
     img.className = 'icon';
     img.draggable = false;
-    // Renders replace icons; stop retrying once this one is gone.
-    load(img, `/assets/${asset}.png?v=${state.assetRevision}`, () => {
+    img.onerror = () => {
         img.hidden = true;
-        showAssetWarning();
-    }, () => img.isConnected);
+        el('asset-warning').hidden = false;
+    };
     return img;
 }
 
-function background(element, asset, revision, language) {
-    const img = new Image();
-    const current = () => state?.assetRevision === revision && state?.language === language;
-    img.onload = () => {
-        if (current()) element.style.backgroundImage = `url('${img.src}')`;
-    };
-    load(img, `/assets/${asset}.png?v=${revision}`, showAssetWarning, current);
-}
-
-// The heading is its own layer so it can fall back to text.
-function pausePanel(element, page, revision, language) {
-    const current = () => state?.assetRevision === revision && state?.language === language;
-    const layers = { heading: 'none', body: 'none' };
-    const apply = () => {
-        if (current()) element.style.backgroundImage = `${layers.heading}, ${layers.body}`;
-    };
-    const text = element.querySelector('.panel-title');
-    const body = new Image();
-    body.onload = () => {
-        layers.body = `url('${body.src}')`;
-        apply();
-    };
-    load(body, `/assets/${page}-${language}.png?v=${revision}`, showAssetWarning, current);
-    const heading = new Image();
-    heading.onload = () => {
-        layers.heading = `url('${heading.src}')`;
-        if (current()) text.hidden = true;
-        apply();
-    };
-    load(heading, `/assets/${page}-title-${language}.png?v=${revision}`, () => {
-        layers.heading = 'none';
-        text.hidden = false;
-        apply();
-    }, current);
+function background(element, url) {
+    element.style.backgroundImage = `url('${url}')`;
+    // CSS backgrounds have no error event, so load the same URL as an image to catch failures.
+    const probe = new Image();
+    probe.onerror = () => el('asset-warning').hidden = false;
+    probe.src = url;
 }
 
 function tint(asset, channel) {
@@ -348,11 +299,11 @@ async function refresh() {
         el('status').textContent = next?.loaded ? (next.canChange ? '' : 'Link is busy') : data.message ?? 'Load a save in Ship.';
         if (next && (state?.assetRevision !== next.assetRevision || state?.language !== next.language)) {
             const { assetRevision: revision, language } = next;
-            pausePanel(document.querySelector('.pause-panel.items'), 'items', revision, language);
-            pausePanel(document.querySelector('.pause-panel.equipment'), 'equipment', revision, language);
-            background(el('to-equipment'), 'gLButtonTex', revision, language);
-            background(el('to-items'), 'gRButtonTex', revision, language);
             el('asset-warning').hidden = true;
+            background(document.querySelector('.pause-panel.items'), `/assets/items-${language}.png?v=${revision}`);
+            background(document.querySelector('.pause-panel.equipment'), `/assets/equipment-${language}.png?v=${revision}`);
+            background(el('to-equipment'), `/assets/gLButtonTex.png?v=${revision}`);
+            background(el('to-items'), `/assets/gRButtonTex.png?v=${revision}`);
         }
         updateColors(next?.colors);
         // Color filters update independently; rainbow changes should not rebuild the controls.
@@ -393,20 +344,9 @@ async function change(payload) {
         render();
     }
 }
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-let polling = false;
-// Hidden tabs stop polling, sparing the game thread and phone battery; showing the tab resumes.
 async function poll() {
-    if (polling) return;
-    polling = true;
-    try {
-        while (!document.hidden) {
-            if (!busy) await refresh();
-            await sleep(250);
-        }
-    } finally {
-        polling = false;
-    }
+    // Hidden tabs skip refreshes to spare the game thread.
+    if (!busy && !document.hidden) await refresh();
+    setTimeout(poll, 250);
 }
-document.addEventListener('visibilitychange', poll);
 poll();

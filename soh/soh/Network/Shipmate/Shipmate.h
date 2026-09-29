@@ -1,7 +1,6 @@
 #pragma once
 #include <nlohmann/json.hpp>
 #include <cstdint>
-#include <stdexcept>
 #include <string>
 #include <vector>
 #include <memory>
@@ -39,11 +38,6 @@ struct AssetContext {
     std::string itemIconPath;
 };
 AssetContext CaptureAssets(const std::string& name);
-
-// Permanent asset failure; served as 500 so the page does not retry.
-struct AssetError : std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
 
 // Resource waits, pixel conversion/compositing and encoding belong to HTTP workers.
 struct Image {

@@ -12,20 +12,16 @@
 #include "soh/ShipInit.hpp"
 #include "soh/cvar_prefixes.h"
 #include <libultraship/bridge/consolevariablebridge.h>
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <deque>
-#include <fstream>
 #include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
-#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -36,60 +32,35 @@ std::unique_ptr<httplib::Server> server;
 std::thread listener;
 std::string error;
 std::string lanUrl;
-int lanPort = 0;
-std::chrono::steady_clock::time_point lanCheckedAt;
 
-#ifndef _WIN32
-// Container, VM, VPN and Apple peer-to-peer interfaces rarely route to a phone.
-bool IsVirtualInterface(std::string_view name) {
-    constexpr std::string_view prefixes[] = { "docker", "br-",  "veth", "virbr",  "vmnet", "vboxnet",   "tun",
-                                              "tap",    "wg",   "utun", "zt",     "lxc",   "lxd",       "cni",
-                                              "podman", "awdl", "llw",  "bridge", "anpi",  "tailscale", "ppp" };
-    return std::any_of(std::begin(prefixes), std::end(prefixes),
-                       [name](std::string_view prefix) { return name.starts_with(prefix); });
-}
-
-std::string DefaultRouteInterface() {
-#ifdef __linux__
-    std::ifstream routes("/proc/net/route");
-    std::string line;
-    std::getline(routes, line); // Header
-    while (std::getline(routes, line)) {
-        std::istringstream fields(line);
-        std::string name, destination;
-        if (fields >> name >> destination && destination == "00000000") {
-            return name;
-        }
-    }
-#endif
-    return {};
-}
-#endif
-
-// Best effort: rank active private IPv4 addresses so the physical LAN wins over virtual
-// adapters (Hyper-V/WSL switches, Docker, VMs, VPN tunnels).
+// Best effort: prefer a 192.168.x.x address, since other private ranges are often virtual
+// adapters (Hyper-V, WSL, Docker); otherwise use the first private IPv4 address.
 std::string FindLanAddress() {
-    std::string best;
-    int bestScore = -1;
-    auto consider = [&](const sockaddr* address, int score) {
-        if (score <= bestScore || !address || address->sa_family != AF_INET) {
+    std::string first, preferred;
+    auto consider = [&](const sockaddr* address) {
+        if (!address || address->sa_family != AF_INET) {
             return;
         }
         const auto& ipv4 = reinterpret_cast<const sockaddr_in*>(address)->sin_addr;
         const uint32_t ip = ntohl(ipv4.s_addr);
-        if ((ip >> 24) != 10 && (ip >> 20) != 0xAC1 && (ip >> 16) != 0xC0A8) {
+        const bool home = (ip >> 16) == 0xC0A8;
+        if (!home && (ip >> 24) != 10 && (ip >> 20) != 0xAC1) {
             return;
         }
         char text[INET_ADDRSTRLEN]{};
-        if (inet_ntop(AF_INET, &ipv4, text, sizeof(text))) {
-            best = text;
-            bestScore = score;
+        if (!inet_ntop(AF_INET, &ipv4, text, sizeof(text))) {
+            return;
+        }
+        if (first.empty()) {
+            first = text;
+        }
+        if (home && preferred.empty()) {
+            preferred = text;
         }
     };
 #ifdef _WIN32
     ULONG size = 0;
-    constexpr ULONG flags =
-        GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS;
+    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
     if (GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &size) != ERROR_BUFFER_OVERFLOW) {
         return {};
     }
@@ -99,16 +70,11 @@ std::string FindLanAddress() {
         return {};
     }
     for (auto* adapter = adapters; adapter; adapter = adapter->Next) {
-        if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) {
+        if (adapter->OperStatus != IfOperStatusUp) {
             continue;
         }
-        // Hyper-V and WSL switches look like Ethernet but have no gateway.
-        int score = adapter->FirstGatewayAddress ? 2 : 0;
-        if (adapter->IfType == IF_TYPE_ETHERNET_CSMACD || adapter->IfType == IF_TYPE_IEEE80211) {
-            score += 1;
-        }
         for (auto* entry = adapter->FirstUnicastAddress; entry; entry = entry->Next) {
-            consider(entry->Address.lpSockaddr, score);
+            consider(entry->Address.lpSockaddr);
         }
     }
 #else
@@ -116,27 +82,14 @@ std::string FindLanAddress() {
     if (getifaddrs(&interfaces) != 0) {
         return {};
     }
-    const auto routeInterface = DefaultRouteInterface();
     for (auto* entry = interfaces; entry; entry = entry->ifa_next) {
-        if (!(entry->ifa_flags & IFF_UP) || (entry->ifa_flags & IFF_LOOPBACK) || !entry->ifa_name) {
-            continue;
+        if ((entry->ifa_flags & IFF_UP) && !(entry->ifa_flags & IFF_LOOPBACK)) {
+            consider(entry->ifa_addr);
         }
-        // A full-tunnel VPN owns the default route, so physical naming outweighs it.
-        int score = IsVirtualInterface(entry->ifa_name) ? 0 : 2;
-        if (routeInterface == entry->ifa_name) {
-            score += 1;
-        }
-        consider(entry->ifa_addr, score);
     }
     freeifaddrs(interfaces);
 #endif
-    return best;
-}
-
-void UpdateLanUrl() {
-    const auto address = FindLanAddress();
-    lanUrl = address.empty() ? std::string() : "http://" + address + ":" + std::to_string(lanPort) + "/";
-    lanCheckedAt = std::chrono::steady_clock::now();
+    return preferred.empty() ? first : preferred;
 }
 struct Job {
     std::function<void()> run;
@@ -149,8 +102,7 @@ std::deque<std::shared_ptr<Job>> jobs;
 std::atomic<bool> jobsPending = false;
 bool accepting = false;
 std::mutex imagesMutex;
-// PNGs for imageGeneration; each entry is shared by requests while its first request encodes it.
-std::unordered_map<std::string, std::shared_future<std::string>> images;
+std::unordered_map<std::string, std::string> images;
 uint64_t imageGeneration = 0;
 
 // Timeout cancels a job before it can make a delayed equipment change.
@@ -245,16 +197,11 @@ const std::string& Error() {
 }
 
 const std::string& LanUrl() {
-    // Wi-Fi changes and DHCP renewals move the address; re-check while the menu shows it.
-    if (lanPort && std::chrono::steady_clock::now() - lanCheckedAt > std::chrono::seconds(5)) {
-        UpdateLanUrl();
-    }
     return lanUrl;
 }
 
 void Disable() {
     lanUrl.clear();
-    lanPort = 0;
     std::deque<std::shared_ptr<Job>> cancelled;
     {
         std::lock_guard lock(jobsMutex);
@@ -323,16 +270,13 @@ bool Enable(bool lan, int port) {
     });
     next->set_exception_handler([](const auto&, auto& response, std::exception_ptr exception) {
         std::string message = "Shipmate request failed";
-        response.status = 503;
         try {
             if (exception) {
                 std::rethrow_exception(exception);
             }
-        } catch (const AssetError& e) {
-            message = e.what();
-            response.status = 500;
         } catch (const std::exception& e) { message = e.what(); } catch (...) {
         }
+        response.status = 503;
         Json(response, { { "status", "failure" }, { "message", message } });
     });
     next->Get("/", Static(Web::Html, "text/html; charset=utf-8"));
@@ -361,14 +305,6 @@ bool Enable(bool lan, int port) {
         // Assets never touch the game thread, so a busy frame cannot fail an icon request.
         const auto context = CaptureAssets(name);
         const auto revision = context.revision;
-        // Waiting for resources and all image processing stay on this HTTP worker.
-        auto render = [&] {
-            auto image = ReadAsset(name, context);
-            return image.rgba.empty() ? std::string() : EncodePng(image);
-        };
-        std::shared_future<std::string> cached;
-        std::promise<std::string> result;
-        bool owner = false;
         {
             std::lock_guard lock(imagesMutex);
             // Revisions only grow; a slower request for an older one must not rewind the cache.
@@ -376,40 +312,23 @@ bool Enable(bool lan, int port) {
                 images.clear();
                 imageGeneration = revision;
             }
-            if (revision == imageGeneration) {
-                // Concurrent misses share one decode instead of each converting the texture.
-                auto [it, inserted] = images.try_emplace(name);
-                if (inserted) {
-                    it->second = result.get_future().share();
-                    owner = true;
-                }
-                cached = it->second;
+            if (auto it = images.find(name); revision == imageGeneration && it != images.end()) {
+                Png(r, request, it->second, revision);
+                return;
             }
         }
-        std::string png;
-        if (!cached.valid()) {
-            png = render(); // Stale revision: serve it without touching the current cache.
-        } else {
-            if (owner) {
-                bool keep = false;
-                try {
-                    auto value = render();
-                    keep = !value.empty();
-                    result.set_value(std::move(value));
-                } catch (...) { result.set_exception(std::current_exception()); }
-                // Drop failures so a retry tries again, and misses so arbitrary names cannot grow the cache.
-                if (!keep) {
-                    std::lock_guard lock(imagesMutex);
-                    if (imageGeneration == revision) {
-                        images.erase(name);
-                    }
-                }
-            }
-            png = cached.get(); // Rethrows a failed decode for the 503 exception handler.
-        }
-        if (png.empty()) {
+        // Waiting for resources and all image processing stay on this HTTP worker.
+        auto image = ReadAsset(name, context);
+        if (image.rgba.empty()) {
             r.status = 404;
             return;
+        }
+        auto png = EncodePng(image);
+        {
+            std::lock_guard lock(imagesMutex);
+            if (imageGeneration == revision) {
+                images[name] = png;
+            }
         }
         Png(r, request, png, revision);
     });
@@ -418,8 +337,10 @@ bool Enable(bool lan, int port) {
         return false;
     }
     if (lan) {
-        lanPort = port;
-        UpdateLanUrl();
+        auto address = FindLanAddress();
+        if (!address.empty()) {
+            lanUrl = "http://" + address + ":" + std::to_string(port) + "/";
+        }
     }
     server = std::move(next);
     {
