@@ -216,6 +216,13 @@ void Json(httplib::Response& response, const nlohmann::json& value) {
     response.set_content(value.dump(), "application/json");
 }
 
+// Serves an embedded web file; the arrays are not null-terminated.
+template <size_t N> auto Static(const unsigned char (&bytes)[N], const char* type) {
+    return [&bytes, type](const httplib::Request&, httplib::Response& response) {
+        response.set_content(reinterpret_cast<const char*>(bytes), N, type);
+    };
+}
+
 bool MatchesRevision(const httplib::Request& request, uint64_t revision) {
     return request.has_param("v") && request.get_param_value("v") == std::to_string(revision);
 }
@@ -322,10 +329,10 @@ bool Enable(bool lan, int port) {
         response.status = 503;
         Json(response, { { "status", "failure" }, { "message", message } });
     });
-    next->Get("/", [](const auto&, auto& r) { r.set_content(Web::Html, "text/html; charset=utf-8"); });
-    next->Get("/app.js", [](const auto&, auto& r) { r.set_content(Web::Js, "text/javascript; charset=utf-8"); });
-    next->Get("/style.css", [](const auto&, auto& r) { r.set_content(Web::Css, "text/css; charset=utf-8"); });
-    next->Get("/favicon.svg", [](const auto&, auto& r) { r.set_content(Web::Favicon, "image/svg+xml"); });
+    next->Get("/", Static(Web::Html, "text/html; charset=utf-8"));
+    next->Get("/app.js", Static(Web::Js, "text/javascript; charset=utf-8"));
+    next->Get("/style.css", Static(Web::Css, "text/css; charset=utf-8"));
+    next->Get("/favicon.svg", Static(Web::Favicon, "image/svg+xml"));
     next->Get("/state", [](const auto&, auto& r) { Json(r, OnGameThread(Snapshot)); });
     next->Post("/action", [](const auto& request, auto& r) {
         auto payload = nlohmann::json::parse(request.body, nullptr, false);
