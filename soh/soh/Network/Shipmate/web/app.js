@@ -51,17 +51,42 @@ function chooseButton(index) {
     }
 }
 
+// A 503 is often transient (scene load hitch, busy queue), so retry with backoff before giving up.
+function load(img, url, onFail, alive = () => true, attempt = 0) {
+    img.onerror = () => {
+        if (!alive()) return;
+        if (attempt >= 3) return onFail();
+        setTimeout(() => {
+            if (alive()) load(img, url, onFail, alive, attempt + 1);
+        }, 500 * 2 ** attempt);
+    };
+    img.src = attempt ? `${url}&retry=${attempt}` : url;
+}
+
+function showAssetWarning() {
+    el('asset-warning').hidden = false;
+}
+
 function icon(asset) {
     const img = document.createElement('img');
-    img.src = `/assets/${asset}.png?v=${state.assetRevision}`;
     img.alt = '';
     img.className = 'icon';
     img.draggable = false;
-    img.onerror = () => {
+    // Renders replace icons; stop retrying once this one is gone.
+    load(img, `/assets/${asset}.png?v=${state.assetRevision}`, () => {
         img.hidden = true;
-        el('asset-warning').hidden = false;
-    };
+        showAssetWarning();
+    }, () => img.isConnected);
     return img;
+}
+
+function background(element, asset, revision) {
+    const img = new Image();
+    const current = () => state?.assetRevision === revision;
+    img.onload = () => {
+        if (current()) element.style.backgroundImage = `url('${img.src}')`;
+    };
+    load(img, `/assets/${asset}.png?v=${revision}`, showAssetWarning, current);
 }
 
 function tint(asset, channel) {
@@ -291,10 +316,10 @@ async function refresh() {
         el('status').textContent = next?.loaded ? (next.canChange ? '' : 'Link is busy') : data.message ?? 'Load a save in Ship.';
         if (next && state?.assetRevision !== next.assetRevision) {
             const revision = next.assetRevision;
-            document.querySelector('.pause-panel.items').style.backgroundImage = `url('/assets/items.png?v=${revision}')`;
-            document.querySelector('.pause-panel.equipment').style.backgroundImage = `url('/assets/equipment.png?v=${revision}')`;
-            el('to-equipment').style.backgroundImage = `url('/assets/gLButtonTex.png?v=${revision}')`;
-            el('to-items').style.backgroundImage = `url('/assets/gRButtonTex.png?v=${revision}')`;
+            background(document.querySelector('.pause-panel.items'), 'items', revision);
+            background(document.querySelector('.pause-panel.equipment'), 'equipment', revision);
+            background(el('to-equipment'), 'gLButtonTex', revision);
+            background(el('to-items'), 'gRButtonTex', revision);
             el('asset-warning').hidden = true;
         }
         updateColors(next?.colors);

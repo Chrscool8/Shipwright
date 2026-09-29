@@ -816,22 +816,38 @@ if(SHIPMATE_SUPPORTED)
     # Shipmate: pinned HTTP-only header; no TLS/compression dependencies.
     set(SHIPMATE_DEPS "${CMAKE_BINARY_DIR}/_deps/shipmate")
     file(MAKE_DIRECTORY "${SHIPMATE_DEPS}")
-    if(NOT EXISTS "${SHIPMATE_DEPS}/httplib.h")
-        file(DOWNLOAD "https://raw.githubusercontent.com/yhirose/cpp-httplib/v0.18.7/httplib.h"
-            "${SHIPMATE_DEPS}/httplib.h"
-            EXPECTED_HASH SHA256=4770f8ea3d3fcd27b0b713c783d9b53bce3baddbd5adad13714011df96142526)
-    endif()
+    # Verify cached files by hash, not existence: a failed download can leave an empty file behind.
+    # Download to a temporary name so only a verified file ever lands at the final path.
+    function(shipmate_download url name hash)
+        set(dest "${SHIPMATE_DEPS}/${name}")
+        if(EXISTS "${dest}")
+            file(SHA256 "${dest}" actual)
+            if(actual STREQUAL hash)
+                return()
+            endif()
+        endif()
+        file(DOWNLOAD "${url}" "${dest}.part" STATUS status)
+        list(GET status 0 code)
+        if(code EQUAL 0)
+            file(SHA256 "${dest}.part" actual)
+            if(NOT actual STREQUAL hash)
+                set(status "SHA256 mismatch: got ${actual}")
+            endif()
+        endif()
+        if(NOT code EQUAL 0 OR NOT actual STREQUAL hash)
+            file(REMOVE "${dest}.part")
+            message(FATAL_ERROR "Shipmate: failed to download ${url} (${status}). "
+                "Check your connection, or place a verified ${name} in ${SHIPMATE_DEPS}.")
+        endif()
+        file(RENAME "${dest}.part" "${dest}")
+    endfunction()
+    shipmate_download("https://raw.githubusercontent.com/yhirose/cpp-httplib/v0.18.7/httplib.h" httplib.h
+        4770f8ea3d3fcd27b0b713c783d9b53bce3baddbd5adad13714011df96142526)
     # Nayuki QR Code generator 1.8.0 (MIT); generated locally for the LAN menu.
-    if(NOT EXISTS "${SHIPMATE_DEPS}/qrcodegen.c")
-        file(DOWNLOAD "https://raw.githubusercontent.com/nayuki/QR-Code-generator/v1.8.0/c/qrcodegen.c"
-            "${SHIPMATE_DEPS}/qrcodegen.c"
-            EXPECTED_HASH SHA256=300eff07ee25baaa7578f20284411638154716379437391e7e689c0e6ce81403)
-    endif()
-    if(NOT EXISTS "${SHIPMATE_DEPS}/qrcodegen.h")
-        file(DOWNLOAD "https://raw.githubusercontent.com/nayuki/QR-Code-generator/v1.8.0/c/qrcodegen.h"
-            "${SHIPMATE_DEPS}/qrcodegen.h"
-            EXPECTED_HASH SHA256=e82df4bff37d18b5863b9e7486fe6bda1b6cda8c3b9ecebfec473907265cb589)
-    endif()
+    shipmate_download("https://raw.githubusercontent.com/nayuki/QR-Code-generator/v1.8.0/c/qrcodegen.c" qrcodegen.c
+        300eff07ee25baaa7578f20284411638154716379437391e7e689c0e6ce81403)
+    shipmate_download("https://raw.githubusercontent.com/nayuki/QR-Code-generator/v1.8.0/c/qrcodegen.h" qrcodegen.h
+        e82df4bff37d18b5863b9e7486fe6bda1b6cda8c3b9ecebfec473907265cb589)
     target_sources(soh PRIVATE "${SHIPMATE_DEPS}/qrcodegen.c")
     if(WIN32)
         target_link_libraries(soh PRIVATE iphlpapi)

@@ -29,16 +29,7 @@ void SohMenu::AddMenuNetwork() {
     AddSidebarEntry("Network", path.sidebarName, 1);
     AddWidget(path, "Enable##Shipmate", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_REMOTE("Shipmate.Enabled"))
-        .Callback([](WidgetInfo&) {
-            if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0)) {
-                if (!Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
-                                      CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort))) {
-                    CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
-                }
-            } else {
-                Shipmate::Disable();
-            }
-        });
+        .Callback([](WidgetInfo&) { Shipmate::ApplySettings(); });
     AddWidget(path, "Port", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
         ImGui::BeginDisabled(Shipmate::IsEnabled() || CVarGetInteger(CVAR_SETTING("DisableChanges"), 0));
         ImGui::Text("%s", info.name.c_str());
@@ -57,10 +48,8 @@ void SohMenu::AddMenuNetwork() {
         .Options(
             CheckboxOptions().Tooltip("Let devices on your network open Shipmate at this PC's IP and configured port."))
         .Callback([](WidgetInfo&) {
-            if (Shipmate::IsEnabled() &&
-                !Shipmate::Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
-                                  CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort))) {
-                CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
+            if (Shipmate::IsEnabled()) {
+                Shipmate::ApplySettings();
             }
         });
     AddWidget(path, "Connect phone##Shipmate", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {

@@ -12,18 +12,23 @@
 #include "soh/ShipInit.hpp"
 #include "soh/cvar_prefixes.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <deque>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace Shipmate {
 namespace {
@@ -31,24 +36,60 @@ std::unique_ptr<httplib::Server> server;
 std::thread listener;
 std::string error;
 std::string lanUrl;
+int lanPort = 0;
+std::chrono::steady_clock::time_point lanCheckedAt;
 
-// Best effort only: use the first active private IPv4 address.
+#ifndef _WIN32
+// Container, VM, VPN and Apple peer-to-peer interfaces rarely route to a phone.
+bool IsVirtualInterface(std::string_view name) {
+    constexpr std::string_view prefixes[] = { "docker", "br-",  "veth", "virbr",  "vmnet", "vboxnet",   "tun",
+                                              "tap",    "wg",   "utun", "zt",     "lxc",   "lxd",       "cni",
+                                              "podman", "awdl", "llw",  "bridge", "anpi",  "tailscale", "ppp" };
+    return std::any_of(std::begin(prefixes), std::end(prefixes),
+                       [name](std::string_view prefix) { return name.starts_with(prefix); });
+}
+
+std::string DefaultRouteInterface() {
+#ifdef __linux__
+    std::ifstream routes("/proc/net/route");
+    std::string line;
+    std::getline(routes, line); // Header
+    while (std::getline(routes, line)) {
+        std::istringstream fields(line);
+        std::string name, destination;
+        if (fields >> name >> destination && destination == "00000000") {
+            return name;
+        }
+    }
+#endif
+    return {};
+}
+#endif
+
+// Best effort: rank active private IPv4 addresses so the physical LAN wins over virtual
+// adapters (Hyper-V/WSL switches, Docker, VMs, VPN tunnels).
 std::string FindLanAddress() {
-    auto privateAddress = [](const sockaddr* address) -> std::string {
-        if (!address || address->sa_family != AF_INET) {
-            return {};
+    std::string best;
+    int bestScore = -1;
+    auto consider = [&](const sockaddr* address, int score) {
+        if (score <= bestScore || !address || address->sa_family != AF_INET) {
+            return;
         }
         const auto& ipv4 = reinterpret_cast<const sockaddr_in*>(address)->sin_addr;
         const uint32_t ip = ntohl(ipv4.s_addr);
         if ((ip >> 24) != 10 && (ip >> 20) != 0xAC1 && (ip >> 16) != 0xC0A8) {
-            return {};
+            return;
         }
         char text[INET_ADDRSTRLEN]{};
-        return inet_ntop(AF_INET, &ipv4, text, sizeof(text)) ? text : "";
+        if (inet_ntop(AF_INET, &ipv4, text, sizeof(text))) {
+            best = text;
+            bestScore = score;
+        }
     };
 #ifdef _WIN32
     ULONG size = 0;
-    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    constexpr ULONG flags =
+        GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS;
     if (GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &size) != ERROR_BUFFER_OVERFLOW) {
         return {};
     }
@@ -58,14 +99,16 @@ std::string FindLanAddress() {
         return {};
     }
     for (auto* adapter = adapters; adapter; adapter = adapter->Next) {
-        if (adapter->OperStatus != IfOperStatusUp) {
+        if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) {
             continue;
         }
+        // Hyper-V and WSL switches look like Ethernet but have no gateway.
+        int score = adapter->FirstGatewayAddress ? 2 : 0;
+        if (adapter->IfType == IF_TYPE_ETHERNET_CSMACD || adapter->IfType == IF_TYPE_IEEE80211) {
+            score += 1;
+        }
         for (auto* entry = adapter->FirstUnicastAddress; entry; entry = entry->Next) {
-            auto address = privateAddress(entry->Address.lpSockaddr);
-            if (!address.empty()) {
-                return address;
-            }
+            consider(entry->Address.lpSockaddr, score);
         }
     }
 #else
@@ -73,19 +116,27 @@ std::string FindLanAddress() {
     if (getifaddrs(&interfaces) != 0) {
         return {};
     }
-    std::string address;
+    const auto routeInterface = DefaultRouteInterface();
     for (auto* entry = interfaces; entry; entry = entry->ifa_next) {
-        if ((entry->ifa_flags & IFF_UP) && !(entry->ifa_flags & IFF_LOOPBACK)) {
-            address = privateAddress(entry->ifa_addr);
-            if (!address.empty()) {
-                break;
-            }
+        if (!(entry->ifa_flags & IFF_UP) || (entry->ifa_flags & IFF_LOOPBACK) || !entry->ifa_name) {
+            continue;
         }
+        // A full-tunnel VPN owns the default route, so physical naming outweighs it.
+        int score = IsVirtualInterface(entry->ifa_name) ? 0 : 2;
+        if (routeInterface == entry->ifa_name) {
+            score += 1;
+        }
+        consider(entry->ifa_addr, score);
     }
     freeifaddrs(interfaces);
-    return address;
 #endif
-    return {};
+    return best;
+}
+
+void UpdateLanUrl() {
+    const auto address = FindLanAddress();
+    lanUrl = address.empty() ? std::string() : "http://" + address + ":" + std::to_string(lanPort) + "/";
+    lanCheckedAt = std::chrono::steady_clock::now();
 }
 struct Job {
     std::function<void()> run;
@@ -186,11 +237,16 @@ const std::string& Error() {
 }
 
 const std::string& LanUrl() {
+    // Wi-Fi changes and DHCP renewals move the address; re-check while the menu shows it.
+    if (lanPort && std::chrono::steady_clock::now() - lanCheckedAt > std::chrono::seconds(5)) {
+        UpdateLanUrl();
+    }
     return lanUrl;
 }
 
 void Disable() {
     lanUrl.clear();
+    lanPort = 0;
     std::deque<std::shared_ptr<Job>> cancelled;
     {
         std::lock_guard lock(jobsMutex);
@@ -332,10 +388,8 @@ bool Enable(bool lan, int port) {
         return false;
     }
     if (lan) {
-        auto address = FindLanAddress();
-        if (!address.empty()) {
-            lanUrl = "http://" + address + ":" + std::to_string(port) + "/";
-        }
+        lanPort = port;
+        UpdateLanUrl();
     }
     server = std::move(next);
     {
@@ -348,11 +402,22 @@ bool Enable(bool lan, int port) {
     return true;
 }
 
-static RegisterShipInitFunc init([] {
-    if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0) &&
-        !Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
+void ApplySettings() {
+    if (!CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0)) {
+        Disable();
+        return;
+    }
+    if (!Enable(CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0),
                 CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), DefaultPort))) {
+        // Persist the reset so a busy port is not retried on every launch.
         CVarSetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0);
+        CVarSave();
+    }
+}
+
+static RegisterShipInitFunc init([] {
+    if (CVarGetInteger(CVAR_REMOTE("Shipmate.Enabled"), 0)) {
+        ApplySettings();
     }
 });
 } // namespace Shipmate

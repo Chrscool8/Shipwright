@@ -13,6 +13,8 @@ namespace Shipmate {
 inline constexpr int DefaultPort = 43385;
 bool Enable(bool lan, int port);
 void Disable();
+// Start, restart or stop from the Shipmate CVars; a failed start turns Enabled off.
+void ApplySettings();
 bool IsEnabled();
 const std::string& Error();
 const std::string& LanUrl();
