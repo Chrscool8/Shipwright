@@ -51,11 +51,16 @@ function chooseButton(index) {
     }
 }
 
-// A 503 is often transient (scene load hitch, busy queue), so retry with backoff before giving up.
+// Only transient failures retry; an <img> can't see the status, so ask with HEAD.
+async function transient(url) {
+    const status = await fetch(url, { method: 'HEAD' }).then(r => r.status, () => 0);
+    return status === 0 || status === 503 || (status >= 200 && status < 300);
+}
+
 function load(img, url, onFail, alive = () => true, attempt = 0) {
-    img.onerror = () => {
+    img.onerror = async () => {
         if (!alive()) return;
-        if (attempt >= 3) return onFail();
+        if (attempt >= 3 || !(await transient(url))) return alive() && onFail();
         setTimeout(() => {
             if (alive()) load(img, url, onFail, alive, attempt + 1);
         }, 500 * 2 ** attempt);
@@ -80,13 +85,40 @@ function icon(asset) {
     return img;
 }
 
-function background(element, asset, revision) {
+function background(element, asset, revision, language) {
     const img = new Image();
-    const current = () => state?.assetRevision === revision;
+    const current = () => state?.assetRevision === revision && state?.language === language;
     img.onload = () => {
         if (current()) element.style.backgroundImage = `url('${img.src}')`;
     };
     load(img, `/assets/${asset}.png?v=${revision}`, showAssetWarning, current);
+}
+
+// The heading is its own layer so it can fall back to text.
+function pausePanel(element, page, revision, language) {
+    const current = () => state?.assetRevision === revision && state?.language === language;
+    const layers = { heading: 'none', body: 'none' };
+    const apply = () => {
+        if (current()) element.style.backgroundImage = `${layers.heading}, ${layers.body}`;
+    };
+    const text = element.querySelector('.panel-title');
+    const body = new Image();
+    body.onload = () => {
+        layers.body = `url('${body.src}')`;
+        apply();
+    };
+    load(body, `/assets/${page}-${language}.png?v=${revision}`, showAssetWarning, current);
+    const heading = new Image();
+    heading.onload = () => {
+        layers.heading = `url('${heading.src}')`;
+        if (current()) text.hidden = true;
+        apply();
+    };
+    load(heading, `/assets/${page}-title-${language}.png?v=${revision}`, () => {
+        layers.heading = 'none';
+        text.hidden = false;
+        apply();
+    }, current);
 }
 
 function tint(asset, channel) {
@@ -314,12 +346,12 @@ async function refresh() {
         const data = await requestJson('/state');
         const next = data.state ?? null;
         el('status').textContent = next?.loaded ? (next.canChange ? '' : 'Link is busy') : data.message ?? 'Load a save in Ship.';
-        if (next && state?.assetRevision !== next.assetRevision) {
-            const revision = next.assetRevision;
-            background(document.querySelector('.pause-panel.items'), 'items', revision);
-            background(document.querySelector('.pause-panel.equipment'), 'equipment', revision);
-            background(el('to-equipment'), 'gLButtonTex', revision);
-            background(el('to-items'), 'gRButtonTex', revision);
+        if (next && (state?.assetRevision !== next.assetRevision || state?.language !== next.language)) {
+            const { assetRevision: revision, language } = next;
+            pausePanel(document.querySelector('.pause-panel.items'), 'items', revision, language);
+            pausePanel(document.querySelector('.pause-panel.equipment'), 'equipment', revision, language);
+            background(el('to-equipment'), 'gLButtonTex', revision, language);
+            background(el('to-items'), 'gRButtonTex', revision, language);
             el('asset-warning').hidden = true;
         }
         updateColors(next?.colors);

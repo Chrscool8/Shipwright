@@ -232,12 +232,34 @@ button.assignment:hover:not(:disabled) {
     display: none;
 }
 
+/* Heading row (32 of 160 px) over the page body. */
 .pause-panel {
     position: relative;
     aspect-ratio: 3 / 2;
-    background-size: 100% 100%;
+    background-size: 100% 20%, 100% 100%;
+    background-position: top, 0 0;
+    background-repeat: no-repeat;
     image-rendering: pixelated;
     container-type: inline-size;
+}
+
+.panel-title {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 20%;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 6cqi;
+    font-weight: bold;
+    text-shadow: 0 1px 2px #000;
+    pointer-events: none;
+}
+
+.panel-title[hidden] {
+    display: none;
 }
 
 .slot {

@@ -20,11 +20,11 @@
 <p id="message" role="status"></p>
 <main id="panels" data-view="items">
     <section id="items-panel" aria-label="Select item">
-        <div class="pause-panel items"><div id="inventory"></div></div>
+        <div class="pause-panel items"><p class="panel-title" hidden>Select Item</p><div id="inventory"></div></div>
         <div class="panel-footer"><button class="page-switch left" id="to-equipment" aria-label="Show equipment" title="Z — Equipment"></button><p class="caption" id="item-name">Select Item</p></div>
     </section>
     <section id="equipment-panel" aria-label="Equipment">
-        <div class="pause-panel equipment"><div id="gear"></div><div id="worn" aria-label="Currently worn gear"></div></div>
+        <div class="pause-panel equipment"><p class="panel-title" hidden>Equipment</p><div id="gear"></div><div id="worn" aria-label="Currently worn gear"></div></div>
         <div class="panel-footer"><p class="caption" id="gear-name">Equipment</p><button class="page-switch right" id="to-items" aria-label="Show items" title="R — Select Item"></button></div>
     </section>
 </main>

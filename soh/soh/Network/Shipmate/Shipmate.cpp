@@ -323,13 +323,16 @@ bool Enable(bool lan, int port) {
     });
     next->set_exception_handler([](const auto&, auto& response, std::exception_ptr exception) {
         std::string message = "Shipmate request failed";
+        response.status = 503;
         try {
             if (exception) {
                 std::rethrow_exception(exception);
             }
+        } catch (const AssetError& e) {
+            message = e.what();
+            response.status = 500;
         } catch (const std::exception& e) { message = e.what(); } catch (...) {
         }
-        response.status = 503;
         Json(response, { { "status", "failure" }, { "message", message } });
     });
     next->Get("/", Static(Web::Html, "text/html; charset=utf-8"));

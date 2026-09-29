@@ -20,9 +20,9 @@ static bool CanChangeEquipment() {
     Player* player = GET_PLAYER(gPlayState);
     // Cover the whole bottle swing and both first-person and Z-targeted aiming.
     return player->actionFunc != Player_Action_SwingBottle && player->unk_6AD != 2 &&
-           player->upperActionFunc != func_808351D4 && gSaveContext.health > 0 &&
-           gPlayState->transitionTrigger == 0 && gPlayState->transitionMode == 0 && gSaveContext.minigameState == 0 &&
-           !gPlayState->shootingGalleryStatus && !(player->stateFlags1 & PLAYER_STATE1_ON_HORSE);
+           player->upperActionFunc != func_808351D4 && gSaveContext.health > 0 && gPlayState->transitionTrigger == 0 &&
+           gPlayState->transitionMode == 0 && gSaveContext.minigameState == 0 && !gPlayState->shootingGalleryStatus &&
+           !(player->stateFlags1 & PLAYER_STATE1_ON_HORSE);
 }
 
 static bool CanAssignSlot(int slot) {
@@ -115,6 +115,7 @@ nlohmann::json Shipmate::Snapshot() {
     bool dpad = CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0);
     nlohmann::json state = { { "loaded", loaded },
                              { "canChange", canChange },
+                             { "language", gSaveContext.language },
                              { "assetRevision", AssetRevision() },
                              { "colors", HudColors() } };
     if (loaded) {
@@ -125,9 +126,9 @@ nlohmann::json Shipmate::Snapshot() {
             auto entry = DescribeItem(gSaveContext.inventory.items[slot]);
             entry["slot"] = slot;
             entry["allowed"] = CanAssignSlot(slot);
-            entry["equipped"] =
-                std::find(std::begin(gSaveContext.equips.cButtonSlots), std::end(gSaveContext.equips.cButtonSlots),
-                          slot) != std::end(gSaveContext.equips.cButtonSlots);
+            const auto buttons = std::begin(gSaveContext.equips.cButtonSlots);
+            const auto buttonsEnd = buttons + (dpad ? ARRAY_COUNT(gSaveContext.equips.cButtonSlots) : CButtonCount);
+            entry["equipped"] = std::find(buttons, buttonsEnd, slot) != buttonsEnd;
             if (slot >= SLOT_BOTTLE_1 && slot <= SLOT_BOTTLE_4) {
                 entry["name"] =
                     entry["name"].get<std::string>() + " (bottle " + std::to_string(slot - SLOT_BOTTLE_1 + 1) + ")";

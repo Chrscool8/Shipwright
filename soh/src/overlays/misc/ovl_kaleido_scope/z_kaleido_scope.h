@@ -50,6 +50,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play);
 void KaleidoScope_SetupItemEquip(PlayState* play, u16 item, u16 slot, s16 animX, s16 animY);
 void KaleidoScope_UpdateItemEquip(PlayState* play);
 void KaleidoScope_AssignItemToButton(PlayState* play, u16 item, u16 slot, u16 button);
+void** KaleidoScope_GetPageTextures(u16 pageIndex, u8 language);
 void KaleidoScope_DrawDungeonMap(PlayState* play, GraphicsContext* gfxCtx);
 void KaleidoScope_DrawWorldMap(PlayState* play, GraphicsContext* gfxCtx);
 void KaleidoScope_UpdatePrompt(PlayState* play);
