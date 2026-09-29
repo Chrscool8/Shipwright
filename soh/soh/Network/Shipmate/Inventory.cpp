@@ -9,12 +9,20 @@
 extern "C" {
 #include "src/overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"
 extern PlayState* gPlayState;
+void Player_Action_SwingBottle(Player* player, PlayState* play);
+s32 func_808351D4(Player* player, PlayState* play); // Projectile ready to fire
 }
 
 static bool CanChangeEquipment() {
-    return GameInteractor::IsSaveLoaded() && GameInteractor::IsPlayerInControl() && gSaveContext.health > 0 &&
+    if (!GameInteractor::IsSaveLoaded() || !GameInteractor::IsPlayerInControl()) {
+        return false;
+    }
+    Player* player = GET_PLAYER(gPlayState);
+    // Cover the whole bottle swing and both first-person and Z-targeted aiming.
+    return player->actionFunc != Player_Action_SwingBottle && player->unk_6AD != 2 &&
+           player->upperActionFunc != func_808351D4 && gSaveContext.health > 0 &&
            gPlayState->transitionTrigger == 0 && gPlayState->transitionMode == 0 && gSaveContext.minigameState == 0 &&
-           !gPlayState->shootingGalleryStatus && !(GET_PLAYER(gPlayState)->stateFlags1 & PLAYER_STATE1_ON_HORSE);
+           !gPlayState->shootingGalleryStatus && !(player->stateFlags1 & PLAYER_STATE1_ON_HORSE);
 }
 
 static bool CanAssignSlot(int slot) {

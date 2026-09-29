@@ -2686,15 +2686,6 @@ s32 Inventory_HasSpecificBottle(u8 bottleItem) {
 }
 
 void Inventory_UpdateBottleItem(PlayState* play, u8 item, u8 button) {
-    // Ignore bottle updates if the button no longer refers to a bottle slot.
-    if (button == 0 || button > ARRAY_COUNT(gSaveContext.equips.cButtonSlots)) {
-        return;
-    }
-    if (gSaveContext.equips.cButtonSlots[button - 1] < SLOT_BOTTLE_1 ||
-        gSaveContext.equips.cButtonSlots[button - 1] > SLOT_BOTTLE_4) {
-        return;
-    }
-
     osSyncPrintf("item_no=%x,  c_no=%x,  Pt=%x  Item_Register=%x\n", item, button,
                  gSaveContext.equips.cButtonSlots[button - 1],
                  gSaveContext.inventory.items[gSaveContext.equips.cButtonSlots[button - 1]]);

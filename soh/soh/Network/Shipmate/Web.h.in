@@ -3,4 +3,5 @@ namespace Shipmate::Web {
 inline constexpr char Html[] = R"SHIPMATE(@SHIPMATE_HTML@)SHIPMATE";
 inline constexpr char Js[] = R"SHIPMATE(@SHIPMATE_JS@)SHIPMATE";
 inline constexpr char Css[] = R"SHIPMATE(@SHIPMATE_CSS@)SHIPMATE";
+inline constexpr char Favicon[] = R"SHIPMATE(@SHIPMATE_FAVICON@)SHIPMATE";
 }
