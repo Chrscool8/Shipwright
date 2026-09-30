@@ -7,6 +7,9 @@ inline constexpr unsigned char Html[] = {
 inline constexpr unsigned char Js[] = {
 @SHIPMATE_JS@
 };
+inline constexpr unsigned char CommonJs[] = {
+@SHIPMATE_COMMON_JS@
+};
 inline constexpr unsigned char Css[] = {
 @SHIPMATE_CSS@
 };

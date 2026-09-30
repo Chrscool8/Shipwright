@@ -14,12 +14,10 @@ const noteButtons = [
     ['gOcarinaBtnIconCUpTex', 'note-up', 121]
 ];
 const questTints ={ 6: 'minuet', 7: 'bolero', 8: 'serenade', 9: 'requiem', 10: 'nocturne', 11: 'prelude', 24: 'heart' };
-const el = id => document.getElementById(id);
 let state = null,
     selected = null,
     selectedButton = null,
-    busy = false,
-    previous = '';
+    busy = false;
 
 function button(disabled, action) {
     const b = document.createElement('button');
@@ -347,62 +345,36 @@ try {
 } catch {
     setView('items');
 }
-async function requestJson(url, options = {}) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    try {
-        const response = await fetch(url, { ...options, signal: controller.signal });
-        return await response.json();
-    } finally {
-        clearTimeout(timeout);
+function setState(next) {
+    el('status').textContent = stateStatus(next) ?? (next.canChange ? '' : 'Link is busy');
+    if (next && (state?.assetRevision !== next.assetRevision || state?.language !== next.language)) {
+        const { assetRevision: revision, language } = next;
+        el('asset-warning').hidden = true;
+        background(document.querySelector('.pause-panel.items'), `/assets/items-${language}.png?v=${revision}`);
+        background(document.querySelector('.pause-panel.equipment'), `/assets/equipment-${language}.png?v=${revision}`);
+        background(document.querySelector('.pause-panel.quest'), `/assets/quest-${language}.png?v=${revision}`);
+        for (const b of document.querySelectorAll('.page-switch.left')) background(b, `/assets/gLButtonTex.png?v=${revision}`);
+        for (const b of document.querySelectorAll('.page-switch.right')) background(b, `/assets/gRButtonTex.png?v=${revision}`);
     }
-}
-
-async function refresh() {
-    try {
-        const data = await requestJson('/state');
-        const next = data.state ?? null;
-        el('status').textContent = next?.loaded ? (next.canChange ? '' : 'Link is busy') : data.message ?? 'Load a save in Ship.';
-        if (next && (state?.assetRevision !== next.assetRevision || state?.language !== next.language)) {
-            const { assetRevision: revision, language } = next;
-            el('asset-warning').hidden = true;
-            background(document.querySelector('.pause-panel.items'), `/assets/items-${language}.png?v=${revision}`);
-            background(document.querySelector('.pause-panel.equipment'), `/assets/equipment-${language}.png?v=${revision}`);
-            background(document.querySelector('.pause-panel.quest'), `/assets/quest-${language}.png?v=${revision}`);
-            for (const b of document.querySelectorAll('.page-switch.left')) background(b, `/assets/gLButtonTex.png?v=${revision}`);
-            for (const b of document.querySelectorAll('.page-switch.right')) background(b, `/assets/gRButtonTex.png?v=${revision}`);
-        }
-        updateColors(next?.colors);
-        // Color filters update independently; rainbow changes should not rebuild the controls.
-        const signature = JSON.stringify(next ? { ...next, colors: undefined } : null);
-        state = next;
-        if (signature !== previous) {
-            previous = signature;
-            render();
-        }
-    } catch {
-        state = null;
-        previous = '';
-        el('status').textContent = 'Shipmate disconnected';
-        render();
-    }
+    state = next;
+    render();
 }
 async function change(payload) {
     busy = true;
     render();
     el('message').textContent = '';
     try {
-        const data = await requestJson('/action', {
+        await requestJson('/action', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
         });
-        el('message').textContent = data.status === 'success' ? '' : data.message ?? data.status;
-        if (data.status === 'success') selected = selectedButton = null;
-    } catch {
-        el('message').textContent = 'Connection lost. Check Ship before retrying.';
+        selected = selectedButton = null;
+    } catch (error) {
+        console.warn('Shipmate action:', error.message);
+        el('message').textContent = 'Could not make that change.';
     }
     try {
         await refresh();
@@ -411,9 +383,10 @@ async function change(payload) {
         render();
     }
 }
-async function poll() {
-    // Hidden tabs skip refreshes to spare the game thread.
-    if (!busy && !document.hidden) await refresh();
-    setTimeout(poll, 250);
-}
-poll();
+const refresh = watchState({
+    // Color filters update independently; rainbow changes should not rebuild the controls.
+    select: next => ({ ...next, colors: undefined }),
+    onPoll: next => updateColors(next?.colors),
+    onChange: setState,
+    paused: () => busy
+});

@@ -106,9 +106,8 @@ std::unordered_map<std::string, std::string> images;
 uint64_t imageGeneration = 0;
 
 // Timeout cancels a job before it can make a delayed equipment change.
-template <typename F> auto OnGameThread(F fn) -> decltype(fn()) {
-    using T = decltype(fn());
-    auto promise = std::make_shared<std::promise<T>>();
+template <typename F> nlohmann::json OnGameThread(F fn) {
+    auto promise = std::make_shared<std::promise<nlohmann::json>>();
     auto result = promise->get_future();
     auto job = std::make_shared<Job>();
     job->run = [promise, fn] {
@@ -281,6 +280,7 @@ bool Enable(bool lan, int port) {
     });
     next->Get("/", Static(Web::Html, "text/html; charset=utf-8"));
     next->Get("/app.js", Static(Web::Js, "text/javascript; charset=utf-8"));
+    next->Get("/common.js", Static(Web::CommonJs, "text/javascript; charset=utf-8"));
     next->Get("/style.css", Static(Web::Css, "text/css; charset=utf-8"));
     next->Get("/tracker", Static(Web::TrackerHtml, "text/html; charset=utf-8"));
     next->Get("/tracker.js", Static(Web::TrackerJs, "text/javascript; charset=utf-8"));

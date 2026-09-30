@@ -1,6 +1,3 @@
-const el = id => document.getElementById(id);
-let previous = '';
-
 // These are the stable pause-menu slots and identifiers already returned by /state.
 const inventory = [
     [0, 0x00, 'Deku Stick'], [1, 0x01, 'Deku Nut'], [2, 0x02, 'Bombs'],
@@ -86,32 +83,15 @@ function emptyState(revision) {
     };
 }
 
-async function refresh() {
-    try {
-        const response = await fetch('/state', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok || data.status !== 'success') throw new Error(data.message ?? `HTTP ${response.status}`);
-        if (!data.state.loaded) {
-            el('status').textContent = 'Waiting for a loaded save…';
-            el('tracker').hidden = false;
-        } else {
-            el('status').textContent = 'Live tracker';
-            el('tracker').hidden = false;
-        }
-        const next = data.state.loaded ? data.state : emptyState(data.state.assetRevision);
-        const signature = JSON.stringify(next);
-        if (signature !== previous) {
-            previous = signature;
-            render(next);
-        }
-    } catch (error) {
-        el('status').textContent = `Disconnected: ${error.message}`;
+watchState({
+    // Compare only displayed data; HUD colors and assignments do not affect this page.
+    select: ({ loaded, assetRevision, items, equipment, upgrades, quest }) =>
+        loaded ? { assetRevision, items, equipment, upgrades, quest } : { assetRevision },
+    onChange(state) {
+        el('status').textContent = stateStatus(state) ?? 'Live tracker';
+        // Keep the last tracker visible while disconnected.
+        if (!state) return;
+        el('tracker').hidden = false;
+        render(state.loaded ? state : emptyState(state.assetRevision));
     }
-}
-
-async function poll() {
-    if (!document.hidden) await refresh();
-    setTimeout(poll, 250);
-}
-
-poll();
+});
