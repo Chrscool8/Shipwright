@@ -282,6 +282,9 @@ bool Enable(bool lan, int port) {
     next->Get("/", Static(Web::Html, "text/html; charset=utf-8"));
     next->Get("/app.js", Static(Web::Js, "text/javascript; charset=utf-8"));
     next->Get("/style.css", Static(Web::Css, "text/css; charset=utf-8"));
+    next->Get("/tracker", Static(Web::TrackerHtml, "text/html; charset=utf-8"));
+    next->Get("/tracker.js", Static(Web::TrackerJs, "text/javascript; charset=utf-8"));
+    next->Get("/tracker.css", Static(Web::TrackerCss, "text/css; charset=utf-8"));
     next->Get("/favicon.svg", Static(Web::Favicon, "image/svg+xml"));
     next->Get("/state", [](const auto&, auto& r) { Json(r, OnGameThread(Snapshot)); });
     next->Post("/action", [](const auto& request, auto& r) {

@@ -177,6 +177,38 @@ nlohmann::json Shipmate::Snapshot() {
             }
             state["upgrades"].push_back(std::move(entry));
         }
+        // Quest points follow the pause menu's cursor order; each group's items are consecutive.
+        state["quest"] = nlohmann::json::array();
+        for (int point = QUEST_MEDALLION_FOREST; point <= QUEST_SKULL_TOKEN; ++point) {
+            if (!CHECK_QUEST_ITEM(point)) {
+                continue;
+            }
+            int item = ITEM_KOKIRI_EMERALD + point - QUEST_KOKIRI_EMERALD;
+            if (point < QUEST_SONG_MINUET) {
+                item = ITEM_MEDALLION_FOREST + point;
+            } else if (point < QUEST_KOKIRI_EMERALD) {
+                item = ITEM_SONG_MINUET + point - QUEST_SONG_MINUET;
+            }
+            auto entry = DescribeItem(item);
+            entry["point"] = point;
+            if (point >= QUEST_SONG_MINUET && point < QUEST_KOKIRI_EMERALD) {
+                // Ocarina button indices, as the pause menu shows them for the selected song.
+                const auto& song = gOcarinaSongButtons[gOcarinaSongItemMap[point - QUEST_SONG_MINUET]];
+                entry["notes"] = std::vector<int>(song.buttonsIndex, song.buttonsIndex + song.numButtons);
+            }
+            if (point == QUEST_SKULL_TOKEN) {
+                entry["tokens"] = gSaveContext.inventory.gsTokens;
+            }
+            state["quest"].push_back(std::move(entry));
+        }
+        // The pause menu draws gItemIcons[ITEM_MAGIC_LARGE + pieces] for 1-3 heart pieces.
+        int pieces = gSaveContext.inventory.questItems >> 28;
+        if (pieces >= 1 && pieces <= 3) {
+            auto entry = DescribeItem(ITEM_MAGIC_LARGE + pieces);
+            entry["name"] = SohUtils::GetItemName(ITEM_HEART_PIECE) + " (" + std::to_string(pieces) + "/4)";
+            entry["point"] = QUEST_HEART_PIECE;
+            state["quest"].push_back(std::move(entry));
+        }
     }
     return { { "status", "success" }, { "state", state } };
 }

@@ -1,4 +1,19 @@
 const labels = ['C-left', 'C-down', 'C-right', 'D-pad up', 'D-pad down', 'D-pad left', 'D-pad right'];
+// Quest Status [x, y, width, height] by cursor point, from the pause menu's quest vertices.
+const questRects = [
+    [194, 42, 24, 24], [194, 74, 24, 24], [166, 92, 24, 24], [138, 74, 24, 24], [138, 42, 24, 24], [166, 24, 24, 24],
+    [14, 102, 12, 20], [32, 102, 12, 20], [50, 102, 12, 20], [68, 102, 12, 20], [86, 102, 12, 20], [104, 102, 12, 20],
+    [14, 80, 12, 20], [32, 80, 12, 20], [50, 80, 12, 20], [68, 80, 12, 20], [86, 80, 12, 20], [104, 80, 12, 20],
+    [142, 128, 20, 20], [168, 128, 20, 20], [194, 128, 20, 20],
+    [12, 24, 20, 20], [36, 24, 20, 20], [12, 48, 20, 20], [68, 24, 44, 44]
+];
+// Song notes by ocarina button index (A, C-down, C-right, C-left, C-up): texture, tint and staff y.
+const noteButtons = [
+    ['gOcarinaBtnIconATex', 'note-a', 142], ['gOcarinaBtnIconCDownTex', 'note-down', 136],
+    ['gOcarinaBtnIconCRightTex', 'note-right', 129], ['gOcarinaBtnIconCLeftTex', 'note-left', 126],
+    ['gOcarinaBtnIconCUpTex', 'note-up', 121]
+];
+const questTints ={ 6: 'minuet', 7: 'bolero', 8: 'serenade', 9: 'requiem', 10: 'nocturne', 11: 'prelude', 24: 'heart' };
 const el = id => document.getElementById(id);
 let state = null,
     selected = null,
@@ -244,11 +259,61 @@ function renderWorn() {
     }
 }
 
+function renderQuest() {
+    for (const entry of state.quest) {
+        const b = document.createElement('div');
+        b.tabIndex = 0;
+        b.setAttribute('role', 'img');
+        const [x, y, width, height] = questRects[entry.point];
+        decorateSlot(b, entry, x, y);
+        b.style.width = `${width / 240 * 100}%`;
+        b.style.height = `${height / 160 * 100}%`;
+        const tint = questTints[entry.point];
+        if (tint && entry.asset) b.querySelector('.icon').style.filter = `url(#tint-${tint})`;
+        // Like the pause menu, only a song under the cursor shows its notes.
+        b.onmouseenter = b.onfocus = () => {
+            el('quest-name').textContent = entry.name;
+            showNotes(entry.notes ?? []);
+        };
+        el('quest').append(b);
+        if (entry.tokens !== undefined) {
+            b.setAttribute('aria-label', `${entry.name}, ${entry.tokens}`);
+            appendTokens(entry.tokens);
+        }
+    }
+}
+
+function showNotes(notes) {
+    el('notes').replaceChildren();
+    notes.forEach((button, i) => {
+        const [texture, channel, y] = noteButtons[button];
+        const note = tint(texture, channel);
+        note.className = 'note';
+        note.style.left = `${(24 + i * 12) / 240 * 100}%`;
+        note.style.top = `${y / 160 * 100}%`;
+        el('notes').append(note);
+    });
+}
+
+function appendTokens(count) {
+    // The pause menu's token counter: digit columns at x 30, 37 and 46, leading zeros hidden, red at 100.
+    const digits = String(count).padStart(3, ' ');
+    [30, 37, 46].forEach((x, i) => {
+        if (digits[i] === ' ') return;
+        const digit = icon(`gCounterDigit${digits[i]}Tex`);
+        digit.className = 'counter-digit';
+        digit.classList.toggle('full', count === 100);
+        digit.style.left = `${x / 240 * 100}%`;
+        el('quest').append(digit);
+    });
+}
+
 function render() {
-    for (const id of ['buttons', 'inventory', 'gear', 'worn']) el(id).replaceChildren();
+    for (const id of ['buttons', 'inventory', 'gear', 'worn', 'quest', 'notes']) el(id).replaceChildren();
     el('unassign').hidden = true;
     el('item-name').textContent = 'Select Item';
     el('gear-name').textContent = 'Equipment';
+    el('quest-name').textContent = 'Quest Status';
     if (!state?.loaded) {
         selected = selectedButton = null;
         return;
@@ -259,23 +324,24 @@ function render() {
     renderInventory(enabled);
     renderEquipment(enabled);
     renderWorn();
+    renderQuest();
 }
 
 function setView(view) {
-    if (!['items', 'equipment'].includes(view)) view = 'items';
+    if (!['items', 'equipment', 'quest'].includes(view)) view = 'items';
     el('panels').dataset.view = view;
     try {
         localStorage.setItem('shipmate-view', view);
     } catch {}
 }
-el('to-equipment').onclick = () => {
-    setView('equipment');
-    el('to-items').focus();
-};
-el('to-items').onclick = () => {
-    setView('items');
-    el('to-equipment').focus();
-};
+for (const b of document.querySelectorAll('.page-switch')) {
+    b.onclick = () => {
+        const from = el('panels').dataset.view;
+        setView(b.dataset.view);
+        // Focus the tab that leads back to the previous page.
+        document.querySelector(`#${b.dataset.view}-panel .page-switch[data-view="${from}"]`)?.focus();
+    };
+}
 try {
     setView(localStorage.getItem('shipmate-view'));
 } catch {
@@ -302,8 +368,9 @@ async function refresh() {
             el('asset-warning').hidden = true;
             background(document.querySelector('.pause-panel.items'), `/assets/items-${language}.png?v=${revision}`);
             background(document.querySelector('.pause-panel.equipment'), `/assets/equipment-${language}.png?v=${revision}`);
-            background(el('to-equipment'), `/assets/gLButtonTex.png?v=${revision}`);
-            background(el('to-items'), `/assets/gRButtonTex.png?v=${revision}`);
+            background(document.querySelector('.pause-panel.quest'), `/assets/quest-${language}.png?v=${revision}`);
+            for (const b of document.querySelectorAll('.page-switch.left')) background(b, `/assets/gLButtonTex.png?v=${revision}`);
+            for (const b of document.querySelectorAll('.page-switch.right')) background(b, `/assets/gRButtonTex.png?v=${revision}`);
         }
         updateColors(next?.colors);
         // Color filters update independently; rainbow changes should not rebuild the controls.

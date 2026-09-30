@@ -10,6 +10,15 @@ inline constexpr unsigned char Js[] = {
 inline constexpr unsigned char Css[] = {
 @SHIPMATE_CSS@
 };
+inline constexpr unsigned char TrackerHtml[] = {
+@SHIPMATE_TRACKER_HTML@
+};
+inline constexpr unsigned char TrackerJs[] = {
+@SHIPMATE_TRACKER_JS@
+};
+inline constexpr unsigned char TrackerCss[] = {
+@SHIPMATE_TRACKER_CSS@
+};
 inline constexpr unsigned char Favicon[] = {
 @SHIPMATE_FAVICON@
 };

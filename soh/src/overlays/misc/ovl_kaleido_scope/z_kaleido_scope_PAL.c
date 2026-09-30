@@ -228,14 +228,6 @@ static void* sSelectItemTexs[] = {
     sSelectItemJPNTexs,
 };
 
-// Shipmate: 15 localized page tiles, 3 columns of 5 rows.
-void** KaleidoScope_GetPageTextures(u16 pageIndex, u8 language) {
-    if (language >= LANGUAGE_MAX) {
-        language = LANGUAGE_ENG;
-    }
-    return (pageIndex == PAUSE_ITEM ? sSelectItemTexs : sEquipmentTexs)[language];
-}
-
 static void* sMapTexs[] = {
     sMapENGTexs,
     sMapGERTexs,
@@ -249,6 +241,17 @@ static void* sQuestStatusTexs[] = {
     sQuestStatusFRATexs,
     sQuestStatusJPNTexs,
 };
+
+// Shipmate: 15 localized page tiles, 3 columns of 5 rows.
+void** KaleidoScope_GetPageTextures(u16 pageIndex, u8 language) {
+    if (language >= LANGUAGE_MAX) {
+        language = LANGUAGE_ENG;
+    }
+    if (pageIndex == PAUSE_QUEST) {
+        return sQuestStatusTexs[language];
+    }
+    return (pageIndex == PAUSE_ITEM ? sSelectItemTexs : sEquipmentTexs)[language];
+}
 
 static void* sSaveTexs[] = {
     sSaveENGTexs,

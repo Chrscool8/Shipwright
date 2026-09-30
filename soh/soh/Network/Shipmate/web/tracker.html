@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shipmate Tracker</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/tracker.css">
+<header>
+    <div>
+        <h1>Shipmate</h1>
+        <p id="status" role="status">Connecting…</p>
+    </div>
+    <a href="/">Pause Menu</a>
+</header>
+<main id="tracker" hidden>
+    <section><h2>Inventory</h2><div class="grid inventory" id="inventory"></div></section>
+    <section><h2>Equipment &amp; Upgrades</h2><div class="grid equipment" id="equipment"></div></section>
+    <section><h2>Songs</h2><div class="grid songs" id="songs"></div></section>
+    <section><h2>Dungeon Rewards &amp; Quest</h2><div class="grid quest" id="quest"></div></section>
+</main>
+<script src="/tracker.js"></script>
+</html>

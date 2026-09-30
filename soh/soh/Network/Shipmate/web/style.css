@@ -192,6 +192,25 @@ button.assignment:hover:not(:disabled) {
     filter: brightness(1.2);
 }
 
+.mode-link {
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    z-index: 10;
+    color: #d9e8c7;
+    font-size: 14px;
+    text-decoration: none;
+    border: 1px solid #748564;
+    border-radius: 4px;
+    padding: 5px 9px;
+    background: #172018e6;
+}
+
+    .mode-link:hover, .mode-link:focus-visible {
+        color: white;
+        border-color: #b7cf9d;
+    }
+
 .ammo, .hud-ammo {
     position: absolute;
     right: 0;
@@ -228,7 +247,9 @@ button.assignment:hover:not(:disabled) {
         margin-inline: auto;
     }
 
-#panels[data-view="items"] #equipment-panel, #panels[data-view="equipment"] #items-panel {
+#panels[data-view="items"] > :not(#items-panel),
+#panels[data-view="equipment"] > :not(#equipment-panel),
+#panels[data-view="quest"] > :not(#quest-panel) {
     display: none;
 }
 
@@ -317,6 +338,29 @@ button.assignment:hover:not(:disabled) {
     bottom: -3%;
     height: 28.57%;
     z-index: 4;
+}
+
+/* 8x16 token counter digits at y 50, with the pause menu's 2px black shadow. */
+.counter-digit {
+    position: absolute;
+    top: 31.25%;
+    width: 3.333333%;
+    height: 10%;
+    pointer-events: none;
+    filter: drop-shadow(.833333cqw .833333cqw #000);
+}
+
+    .counter-digit.full {
+        filter: url(#tint-full) drop-shadow(.833333cqw .833333cqw #000);
+    }
+
+/* 12x12 song notes on the staff, at the pause menu's 200 alpha. */
+.note {
+    position: absolute;
+    width: 5%;
+    height: 7.5%;
+    opacity: .784;
+    pointer-events: none;
 }
 
 #worn {

@@ -12,20 +12,39 @@
         <filter id="tint-down" color-interpolation-filters="sRGB"><feColorMatrix id="color-down" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
         <filter id="tint-right" color-interpolation-filters="sRGB"><feColorMatrix id="color-right" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
         <filter id="tint-dpad" color-interpolation-filters="sRGB"><feColorMatrix id="color-dpad" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-note-a" color-interpolation-filters="sRGB"><feColorMatrix id="color-note-a" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-note-down" color-interpolation-filters="sRGB"><feColorMatrix id="color-note-down" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-note-right" color-interpolation-filters="sRGB"><feColorMatrix id="color-note-right" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-note-left" color-interpolation-filters="sRGB"><feColorMatrix id="color-note-left" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-note-up" color-interpolation-filters="sRGB"><feColorMatrix id="color-note-up" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <!-- Fixed Quest Status colors from z_kaleido_collect.c. -->
+        <filter id="tint-minuet" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".588 0 0 0 0 0 1 0 0 0 0 0 .392 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-bolero" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0 0 .314 0 0 0 0 0 .157 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-serenade" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".392 0 0 0 0 0 .588 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-requiem" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0 0 .627 0 0 0 0 0 0 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-nocturne" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0 0 .392 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-prelude" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0 0 .941 0 0 0 0 0 .392 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-full" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".784 0 0 0 0 0 .196 0 0 0 0 0 .196 0 0 0 0 0 1 0" /></filter>
+        <filter id="tint-heart" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" /></filter>
     </defs>
 </svg>
 <p id="status" role="status">Connecting…</p>
+<a class="mode-link" href="/tracker">Tracker</a>
 <div id="buttons" aria-label="Current button assignments"></div>
 <button id="unassign" hidden>Unassign</button>
 <p id="message" role="status"></p>
 <main id="panels" data-view="items">
     <section id="items-panel" aria-label="Select item">
         <div class="pause-panel items"><div id="inventory"></div></div>
-        <div class="panel-footer"><button class="page-switch left" id="to-equipment" aria-label="Show equipment" title="Z — Equipment"></button><p class="caption" id="item-name">Select Item</p></div>
+        <div class="panel-footer"><button class="page-switch left" data-view="equipment" aria-label="Show equipment" title="Z — Equipment"></button><p class="caption" id="item-name">Select Item</p></div>
     </section>
     <section id="equipment-panel" aria-label="Equipment">
         <div class="pause-panel equipment"><div id="gear"></div><div id="worn" aria-label="Currently worn gear"></div></div>
-        <div class="panel-footer"><p class="caption" id="gear-name">Equipment</p><button class="page-switch right" id="to-items" aria-label="Show items" title="R — Select Item"></button></div>
+        <div class="panel-footer"><button class="page-switch left" data-view="quest" aria-label="Show quest status" title="Z — Quest Status"></button><p class="caption" id="gear-name">Equipment</p><button class="page-switch right" data-view="items" aria-label="Show items" title="R — Select Item"></button></div>
+    </section>
+    <section id="quest-panel" aria-label="Quest status">
+        <div class="pause-panel quest"><div id="quest"></div><div id="notes" aria-hidden="true"></div></div>
+        <div class="panel-footer"><p class="caption" id="quest-name">Quest Status</p><button class="page-switch right" data-view="equipment" aria-label="Show equipment" title="R — Equipment"></button></div>
     </section>
 </main>
 <p id="asset-warning" hidden>Unable to load a game texture.</p>

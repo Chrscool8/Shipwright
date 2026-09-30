@@ -56,11 +56,23 @@ nlohmann::json HudColors() {
     auto b = CVarGetInteger(CVAR_COSMETIC("DefaultColorScheme"), 0) == 1 ? std::array<int, 3>{ 255, 30, 30 }
                                                                          : std::array<int, 3>{ 0, 150, 0 };
     auto c = Color("HUD.CButtons", { 255, 160, 0 });
+    // Song notes follow the pause menu: its own defaults, grayed when a randomizer ocarina button is missing.
+    auto a = CVarGetInteger(CVAR_COSMETIC("DefaultColorScheme"), 0) == 1 ? std::array<int, 3>{ 80, 255, 150 }
+                                                                         : std::array<int, 3>{ 80, 150, 255 };
+    auto noteC = Color("HUD.CButtons", { 255, 255, 50 });
+    auto note = [](std::array<int, 3> color, GIVanillaBehavior flag) {
+        return GameInteractor_Should(flag, true) ? color : std::array<int, 3>{ 191, 191, 191 };
+    };
     return { { "b", Color("HUD.BButton", b) },
              { "left", Color("HUD.CLeftButton", c) },
              { "down", Color("HUD.CDownButton", c) },
              { "right", Color("HUD.CRightButton", c) },
-             { "dpad", Color("HUD.Dpad", { 255, 255, 255 }) } };
+             { "dpad", Color("HUD.Dpad", { 255, 255, 255 }) },
+             { "note-a", note(Color("HUD.AButton", a), VB_HAVE_OCARINA_NOTE_D4) },
+             { "note-down", note(Color("HUD.CDownButton", noteC), VB_HAVE_OCARINA_NOTE_F4) },
+             { "note-right", note(Color("HUD.CRightButton", noteC), VB_HAVE_OCARINA_NOTE_A4) },
+             { "note-left", note(Color("HUD.CLeftButton", noteC), VB_HAVE_OCARINA_NOTE_B4) },
+             { "note-up", note(Color("HUD.CUpButton", noteC), VB_HAVE_OCARINA_NOTE_D5) } };
 }
 
 // Exact "<prefix><n>": no sign or leading zeros.
@@ -199,17 +211,22 @@ static Image Texture(const std::string& name, const AssetContext& context) {
 }
 
 Image ReadAsset(const std::string& name, const AssetContext& context) {
-    // Pause pages are "items-<language>" and "equipment-<language>".
-    int language;
-    const bool items = ParseIndexed(name, "items-", language);
-    if (!items && !ParseIndexed(name, "equipment-", language)) {
+    // Pause pages are "items-<language>", "equipment-<language>" and "quest-<language>".
+    int language, page;
+    if (ParseIndexed(name, "items-", language)) {
+        page = PAUSE_ITEM;
+    } else if (ParseIndexed(name, "equipment-", language)) {
+        page = PAUSE_EQUIP;
+    } else if (ParseIndexed(name, "quest-", language)) {
+        page = PAUSE_QUEST;
+    } else {
         return Texture(name, context);
     }
     if (language >= LANGUAGE_MAX) {
         return {};
     }
     // The pause menu's own tables, 3 columns of 5 rows.
-    void** pageTextures = KaleidoScope_GetPageTextures(items ? PAUSE_ITEM : PAUSE_EQUIP, language);
+    void** pageTextures = KaleidoScope_GetPageTextures(page, language);
     std::array<Image, 15> tiles;
     int scale = 1;
     for (size_t i = 0; i < tiles.size(); ++i) {
@@ -223,8 +240,15 @@ Image ReadAsset(const std::string& name, const AssetContext& context) {
     }
     Image result{ 240 * scale, 160 * scale, {} };
     result.rgba.resize(size_t(result.width) * result.height * 4);
-    const std::array<int, 3> edge = items ? std::array<int, 3>{ 10, 50, 80 } : std::array<int, 3>{ 10, 50, 40 };
-    const std::array<int, 3> center = items ? std::array<int, 3>{ 70, 100, 130 } : std::array<int, 3>{ 90, 100, 60 };
+    // Page vertex colors from the pause menu's pageColors.
+    std::array<int, 3> edge = { 10, 50, 80 }, center = { 70, 100, 130 };
+    if (page == PAUSE_EQUIP) {
+        edge = { 10, 50, 40 };
+        center = { 90, 100, 60 };
+    } else if (page == PAUSE_QUEST) {
+        edge = { 80, 80, 50 };
+        center = { 120, 120, 70 };
+    }
     for (int y = 0; y < result.height; ++y) {
         for (int x = 0; x < result.width; ++x) {
             int col = x / (80 * scale), row = y / (32 * scale);
