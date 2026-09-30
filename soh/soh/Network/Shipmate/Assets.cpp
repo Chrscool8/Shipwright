@@ -63,7 +63,16 @@ nlohmann::json HudColors() {
     auto note = [](std::array<int, 3> color, GIVanillaBehavior flag) {
         return GameInteractor_Should(flag, true) ? color : std::array<int, 3>{ 191, 191, 191 };
     };
-    return { { "b", Color("HUD.BButton", b) },
+    // Hearts shade from border to fill by texel intensity (HealthMeter_Draw); magic defaults from z_parameter.c.
+    return { { "heart-fill", Color("Consumable.Hearts", { 255, 70, 50 }) },
+             { "heart-border", Color("Consumable.HeartBorder", { 50, 40, 60 }) },
+             { "dd-fill", Color("Consumable.DDHearts", { 200, 0, 0 }) },
+             { "dd-border", Color("Consumable.DDHeartBorder", { 255, 255, 255 }) },
+             { "magic-border", Color("Consumable.MagicBorder", { 255, 255, 255 }) },
+             { "magic", Color("Consumable.Magic", { 0, 200, 0 }) },
+             // Interface_DrawMagicBar reads this one without the usual "Consumable." path.
+             { "magic-infinite", Color("Consumable_MagicInfinite", { 0, 0, 200 }) },
+             { "b", Color("HUD.BButton", b) },
              { "left", Color("HUD.CLeftButton", c) },
              { "down", Color("HUD.CDownButton", c) },
              { "right", Color("HUD.CRightButton", c) },

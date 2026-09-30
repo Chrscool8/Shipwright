@@ -121,6 +121,13 @@ nlohmann::json Shipmate::Snapshot() {
     if (loaded) {
         state["fileNum"] = gSaveContext.fileNum;
         state["age"] = gSaveContext.linkAge;
+        // Life meter and magic bar, in the HUD's own units (16 health per heart, magic in bar pixels).
+        state["meters"] = { { "health", gSaveContext.health },
+                            { "healthCapacity", gSaveContext.healthCapacity },
+                            { "doubleDefense", gSaveContext.isDoubleDefenseAcquired != 0 },
+                            { "magic", gSaveContext.magicLevel ? gSaveContext.magic : 0 },
+                            { "magicCapacity", gSaveContext.magicLevel ? gSaveContext.magicCapacity : 0 },
+                            { "infiniteMagic", Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_MAGIC_METER) != 0 } };
         state["items"] = nlohmann::json::array();
         for (int slot = 0; slot < ARRAY_COUNT(gSaveContext.inventory.items); ++slot) {
             auto entry = DescribeItem(gSaveContext.inventory.items[slot]);

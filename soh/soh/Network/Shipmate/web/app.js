@@ -64,9 +64,9 @@ function chooseButton(index) {
     }
 }
 
-function icon(asset) {
+function icon(asset, revision = state.assetRevision) {
     const img = document.createElement('img');
-    img.src = `/assets/${asset}.png?v=${state.assetRevision}`;
+    img.src = `/assets/${asset}.png?v=${revision}`;
     img.alt = '';
     img.className = 'icon';
     img.draggable = false;
@@ -91,11 +91,86 @@ function tint(asset, channel) {
     return img;
 }
 
+// Color matrix mapping texel intensity 0 to `from` and 1 to `to`; from black, it is a plain tint.
+function lerpMatrix(from, to) {
+    const row = c => [0, 1, 2, 3].map(i => i === c ? (to[c] - from[c]) / 255 : 0).join(' ') + ` ${from[c] / 255}`;
+    return `${row(0)} ${row(1)} ${row(2)} 0 0 0 1 0`;
+}
+
 function updateColors(colors) {
     if (!colors) return;
-    for (const [channel, [r, g, b]] of Object.entries(colors)) {
-        el(`color-${channel}`).setAttribute('values', `${r/255} 0 0 0 0 0 ${g/255} 0 0 0 0 0 ${b/255} 0 0 0 0 0 1 0`);
+    for (const [channel, color] of Object.entries(colors)) {
+        el(`color-${channel}`)?.setAttribute('values', lerpMatrix([0, 0, 0], color));
     }
+    el('color-life').setAttribute('values', lerpMatrix(colors['heart-border'], colors['heart-fill']));
+    el('color-life-dd').setAttribute('values', lerpMatrix(colors['dd-border'], colors['dd-fill']));
+    el('meters').style.setProperty('--magic', `rgb(${colors.magic})`);
+    el('meters').style.setProperty('--magic-infinite', `rgb(${colors['magic-infinite']})`);
+}
+
+// Life meter and magic bar in the HUD's pixels (--m): hearts 10px apart in rows of ten at the HUD's
+// 0.7 scale, and the magic bar's 8px ends around a 24px tiled middle, filled 3px down for 7px.
+function heartTexture(fraction) {
+    return fraction === 0 ? 'Full' : fraction < 6 ? 'Quarter' : fraction < 11 ? 'Half' : 'ThreeQuarter';
+}
+
+function place(element, x, y, width, height) {
+    Object.assign(element.style, {
+        left: `calc(${x} * var(--m))`,
+        top: `calc(${y} * var(--m))`,
+        width: `calc(${width} * var(--m))`,
+        height: `calc(${height} * var(--m))`
+    });
+    return element;
+}
+
+let metersSignature;
+function renderMeters(next) {
+    const meters = next?.loaded ? next.meters : null;
+    const signature = JSON.stringify([meters, next?.assetRevision]);
+    if (signature === metersSignature) return;
+    metersSignature = signature;
+    el('meters').replaceChildren();
+    el('meters').hidden = !meters;
+    if (!meters) return;
+    const revision = next.assetRevision;
+    const { health, healthCapacity, doubleDefense, magic, magicCapacity, infiniteMagic } = meters;
+    // HealthMeter_Draw: the heart after the last full one shows the remaining sixteenths.
+    const total = Math.floor(healthCapacity / 16);
+    const fraction = health % 16;
+    let full = Math.floor(health / 16);
+    if (!fraction) full--;
+    const hearts = document.createElement('div');
+    hearts.className = 'hearts';
+    // Sized to the hearts themselves so the rows center over the magic bar.
+    hearts.style.width = `calc(${(Math.min(total, 10) - 1) * 10 + 11.2} * var(--m))`;
+    hearts.style.height = `calc(${(Math.ceil(total / 10) - 1) * 10 + 11.2} * var(--m))`;
+    for (let i = 0; i < total; i++) {
+        const kind = i < full ? 'Full' : i === full ? heartTexture(fraction) : 'Empty';
+        const heart = icon(`g${doubleDefense ? 'Defense' : ''}Heart${kind}Tex`, revision);
+        heart.style.filter = `url(#tint-${doubleDefense ? 'life-dd' : 'life'})`;
+        hearts.append(place(heart, (i % 10) * 10, Math.floor(i / 10) * 10, 11.2, 11.2));
+    }
+    el('meters').append(hearts);
+    let label = `Hearts: ${health / 16} of ${total}`;
+    if (magicCapacity > 0) {
+        const bar = document.createElement('div');
+        bar.className = 'magic';
+        bar.style.width = `calc(${magicCapacity + 16} * var(--m))`;
+        const left = icon('gMagicMeterEndTex', revision);
+        const right = icon('gMagicMeterEndTex', revision);
+        right.className = 'icon mirrored';
+        const middle = document.createElement('div');
+        background(middle, `/assets/gMagicMeterMidTex.png?v=${revision}`);
+        const fill = document.createElement('div');
+        fill.className = `fill${infiniteMagic ? ' infinite' : ''}`;
+        bar.append(place(left, 0, 0, 8, 16), place(middle, 8, 0, magicCapacity, 16),
+            place(right, magicCapacity + 8, 0, 8, 16), place(fill, 8, 3, magic, 7));
+        for (const part of [left, middle, right]) part.style.filter = 'url(#tint-magic-border)';
+        el('meters').append(bar);
+        label += `. Magic: ${magic} of ${magicCapacity}`;
+    }
+    el('meters').setAttribute('aria-label', label);
 }
 
 function decorateSlot(b, entry, x, y) {
@@ -345,6 +420,22 @@ try {
 } catch {
     setView('items');
 }
+// The toolbar is pinned outside #screen, so mirror the screen's scale onto it.
+new ResizeObserver(() => {
+    document.querySelector('.toolbar').style.setProperty('--u', getComputedStyle(el('screen')).getPropertyValue('--u'));
+}).observe(el('screen'));
+// Browsers without the Fullscreen API (such as iPhone Safari) keep the button hidden.
+if (document.fullscreenEnabled) {
+    const fullscreen = el('fullscreen');
+    fullscreen.hidden = false;
+    fullscreen.onclick = () => {
+        const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+        request.catch(error => console.warn('Shipmate fullscreen:', error.message));
+    };
+    document.onfullscreenchange = () => {
+        fullscreen.setAttribute('aria-pressed', String(!!document.fullscreenElement));
+    };
+}
 function setState(next) {
     el('status').textContent = stateStatus(next) ?? (next.canChange ? '' : 'Link is busy');
     if (next && (state?.assetRevision !== next.assetRevision || state?.language !== next.language)) {
@@ -384,9 +475,12 @@ async function change(payload) {
     }
 }
 const refresh = watchState({
-    // Color filters update independently; rainbow changes should not rebuild the controls.
-    select: next => ({ ...next, colors: undefined }),
-    onPoll: next => updateColors(next?.colors),
+    // Colors and meters update independently; rainbow colors and health changes should not rebuild the controls.
+    select: next => ({ ...next, colors: undefined, meters: undefined }),
+    onPoll: next => {
+        updateColors(next?.colors);
+        renderMeters(next);
+    },
     onChange: setState,
     paused: () => busy
 });

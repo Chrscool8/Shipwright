@@ -10,7 +10,6 @@ body {
     margin: 0 auto;
     padding: clamp(8px, 2dvh, 24px) 20px;
     height: 100dvh;
-    max-width: 820px;
     display: flex;
     flex-direction: column;
     background: #101311;
@@ -59,14 +58,42 @@ button {
         outline: 2px solid #fff2a9;
         outline-offset: 3px;
     }
+/* The HUD, toolbar and pause panels scale together in --u units, fitting a
+   --w x --h screen into the space left after the status lines. The pause panel
+   is 720u x 533u (480u panel + 53u footer). Tall spaces put the 360u x 120u HUD
+   row above it (720u x 672u, rounded up); wide spaces stack the HUD into a 130u
+   column on its left (874u x 533u). The layouts trade off at 874/672 width to
+   height, where both scale equally. */
+@property --u {
+    syntax: '<length>';
+    inherits: true;
+    initial-value: 1px;
+}
+
+#stage {
+    flex: 1;
+    min-height: 0;
+    container: stage / size;
+}
+
+#screen {
+    --w: 720;
+    --h: 672;
+    --u: min(100cqw / var(--w), 100cqh / var(--h));
+    position: relative;
+    width: calc(var(--w) * var(--u));
+    margin-inline: auto;
+}
+
+
 /* Center the B, C-button, and D-pad groups. */
 #buttons {
     display: grid;
     grid-template-columns: 56fr 116fr 108fr;
     align-items: center;
-    gap: clamp(12px, 4vw, 24px);
-    width: min(100%, 360px, 50dvh);
-    margin: 0 auto clamp(6px, 2dvh, 18px);
+    gap: calc(24 * var(--u));
+    width: calc(360 * var(--u));
+    margin: 0 auto calc(18 * var(--u));
     container-type: inline-size;
 }
 
@@ -192,23 +219,52 @@ button.assignment:hover:not(:disabled) {
     filter: brightness(1.2);
 }
 
-.mode-link {
+/* Pinned to the window's top-right corner, free to overlap the HUD row's empty
+   right side on narrow windows. It sits outside #screen, so app.js copies --u to it. */
+.toolbar {
     position: fixed;
     top: 12px;
     right: 14px;
     z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: calc(6 * var(--u));
+}
+
+.tool {
+    width: calc(34 * var(--u));
+    height: calc(34 * var(--u));
+    padding: 0;
+    display: grid;
+    place-items: center;
     color: #d9e8c7;
-    font-size: 14px;
-    text-decoration: none;
     border: 1px solid #748564;
-    border-radius: 4px;
-    padding: 5px 9px;
+    border-radius: calc(4 * var(--u));
     background: #172018e6;
 }
 
-    .mode-link:hover, .mode-link:focus-visible {
+    .tool:hover, .tool:focus-visible {
         color: white;
         border-color: #b7cf9d;
+    }
+
+    .tool:focus-visible {
+        outline: 2px solid #fff2a9;
+        outline-offset: 3px;
+    }
+
+    .tool svg {
+        width: 53%;
+        height: 53%;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .tool[aria-pressed="true"] .enter, .tool[aria-pressed="false"] .exit {
+        display: none;
     }
 
 .ammo, .hud-ammo {
@@ -226,26 +282,16 @@ button.assignment:hover:not(:disabled) {
 
 .hud-ammo {
     bottom: -2px;
-    height: clamp(10px, 3.6cqw, 13px);
+    height: calc(13 * var(--u));
 }
 
     .hud-ammo img {
         image-rendering: pixelated;
     }
 
-/* Fit the 3:2 panel into the space left after HUD/status controls, reserving
-   53px for the caption and Z/R tabs. */
 #panels {
     margin: 0;
-    flex: 1;
-    min-height: 0;
-    container-type: size;
 }
-
-    #panels > section {
-        width: min(100cqw, max(0px, calc((100cqh - 53px) * 1.5)));
-        margin-inline: auto;
-    }
 
 #panels[data-view="items"] > :not(#items-panel),
 #panels[data-view="equipment"] > :not(#equipment-panel),
@@ -395,18 +441,22 @@ button.assignment:hover:not(:disabled) {
         image-rendering: pixelated;
     }
 
+/* A fixed 32u height keeps the footer's reserved space exact; the font keeps a
+   readable floor on small panels. */
 .caption {
     text-align: center;
-    min-height: 32px;
-    padding: 5px 12px;
+    height: calc(32 * var(--u));
+    padding: 0 calc(12 * var(--u));
     margin: 0;
     grid-column: 2;
     grid-row: 1;
     background: #202b2a;
     border: 1px solid #6e806c;
-    border-radius: 14px;
+    border-radius: calc(14 * var(--u));
     color: #fff;
-    text-shadow: 1px 2px #000;
+    font-size: max(10px, 15 * var(--u));
+    line-height: calc(32 * var(--u) - 2px);
+    text-shadow: calc(1 * var(--u)) calc(2 * var(--u)) #000;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -418,22 +468,75 @@ button.assignment:hover:not(:disabled) {
     }
 }
 
+/* Life meter and magic bar, centered in the 180u x 120u left of the HUD row. --m is one
+   HUD pixel, fitting the 112px-wide double magic bar into the column layout's 130u. */
+#meters {
+    --m: calc(var(--u) * 130 / 112);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(180 * var(--u));
+    height: calc(120 * var(--u));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(2.4 * var(--m));
+    pointer-events: none;
+}
+
+    #meters .hearts, #meters .magic {
+        position: relative;
+    }
+
+    #meters .magic {
+        height: calc(16 * var(--m));
+    }
+
+    #meters img, #meters .magic > div {
+        position: absolute;
+    }
+
+    #meters .magic > div:not(.fill) {
+        background: left / calc(24 * var(--m)) 100% repeat-x;
+    }
+
+    #meters .mirrored {
+        transform: scaleX(-1);
+    }
+
+    #meters .fill {
+        background: var(--magic, rgb(0 200 0));
+    }
+
+        #meters .fill.infinite {
+            background: var(--magic-infinite, rgb(0 0 200));
+        }
+
+/* Bottom-right of the HUD row, opposite the meters, so showing it never moves the panel. */
 #unassign {
-    display: block;
-    margin: 0 auto 12px;
+    position: absolute;
+    top: calc(120 * var(--u));
+    right: 0;
+    transform: translateY(-100%);
+    z-index: 10;
+    padding: calc(8 * var(--u)) calc(14 * var(--u));
+    border-radius: calc(4 * var(--u));
+    font-size: calc(15 * var(--u));
+    white-space: nowrap;
 }
 
 .panel-footer {
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) 36px;
-    gap: 8px;
+    grid-template-columns: calc(36 * var(--u)) minmax(0, 1fr) calc(36 * var(--u));
+    gap: calc(8 * var(--u));
     align-items: center;
-    margin: 5px 4% 0;
+    margin: calc(5 * var(--u)) 4% 0;
 }
 /* Original pause-menu Z/R tabs (the left asset is named gLButtonTex in the game). */
 .page-switch {
-    width: 36px;
-    height: 48px;
+    width: calc(36 * var(--u));
+    height: calc(48 * var(--u));
     grid-row: 1;
     padding: 0;
     border: 0;
@@ -441,7 +544,7 @@ button.assignment:hover:not(:disabled) {
     z-index: 5;
     background: transparent center / contain no-repeat;
     /* The 24x32 texture has six transparent bottom rows: center its visible 24x26 artwork. */
-    background-position: center calc(50% + 4.5px);
+    background-position: center calc(50% + 4.5 * var(--u));
 }
 
     .page-switch.left {
@@ -455,3 +558,70 @@ button.assignment:hover:not(:disabled) {
     .page-switch:hover {
         filter: brightness(1.2);
     }
+
+/* Wide spaces: the HUD column layout described at #screen. */
+@container stage (aspect-ratio > 874 / 672) {
+    #screen {
+        --w: 874;
+        --h: 533;
+        display: grid;
+        grid-template-columns: calc(130 * var(--u)) calc(720 * var(--u));
+        /* The spanning panel's height goes to the HUD row, keeping the meters row tight. */
+        grid-template-rows: auto 1fr;
+        column-gap: calc(24 * var(--u));
+        align-items: start;
+    }
+
+    /* The meters head the column, above the HUD, beside the panel. */
+    #meters {
+        position: static;
+        grid-column: 1;
+        grid-row: 1;
+        width: auto;
+        height: auto;
+    }
+
+    #panels {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+    }
+
+    /* B, the C triangle and the D-pad top to bottom, at the row layout's sizes. */
+    #buttons {
+        grid-column: 1;
+        grid-row: 2;
+        grid-template-columns: none;
+        justify-items: center;
+        width: auto;
+        margin: calc(24 * var(--u)) 0 0;
+    }
+
+        .assignment.hud-b, .hud-c-buttons, .hud-dpad {
+            grid-column: 1;
+        }
+
+        .assignment.hud-b {
+            width: calc(62.4 * var(--u));
+        }
+
+        .hud-c-buttons {
+            grid-row: 2;
+            width: calc(129.3 * var(--u));
+        }
+
+        .hud-dpad {
+            grid-row: 3;
+            width: calc(120.3 * var(--u));
+        }
+
+    /* Below the D-pad, wrapping to the column's width. */
+    #unassign {
+        top: auto;
+        right: auto;
+        bottom: 0;
+        left: 0;
+        transform: none;
+        width: calc(130 * var(--u));
+        white-space: normal;
+    }
+}
