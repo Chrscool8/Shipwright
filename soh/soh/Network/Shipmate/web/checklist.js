@@ -88,10 +88,10 @@ watchState({
     select: ({ loaded, assetRevision, items, equipment, upgrades, quest }) =>
         loaded ? { assetRevision, items, equipment, upgrades, quest } : { assetRevision },
     onChange(state) {
-        el('status').textContent = stateStatus(state) ?? 'Live tracker';
-        // Keep the last tracker visible while disconnected.
+        el('status').textContent = stateStatus(state) ?? 'Live checklist';
+        // Keep the last checklist visible while disconnected.
         if (!state) return;
-        el('tracker').hidden = false;
+        el('checklist').hidden = false;
         render(state.loaded ? state : emptyState(state.assetRevision));
     }
 });

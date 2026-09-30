@@ -13,14 +13,14 @@ inline constexpr unsigned char CommonJs[] = {
 inline constexpr unsigned char Css[] = {
 @SHIPMATE_CSS@
 };
-inline constexpr unsigned char TrackerHtml[] = {
-@SHIPMATE_TRACKER_HTML@
+inline constexpr unsigned char ChecklistHtml[] = {
+@SHIPMATE_CHECKLIST_HTML@
 };
-inline constexpr unsigned char TrackerJs[] = {
-@SHIPMATE_TRACKER_JS@
+inline constexpr unsigned char ChecklistJs[] = {
+@SHIPMATE_CHECKLIST_JS@
 };
-inline constexpr unsigned char TrackerCss[] = {
-@SHIPMATE_TRACKER_CSS@
+inline constexpr unsigned char ChecklistCss[] = {
+@SHIPMATE_CHECKLIST_CSS@
 };
 inline constexpr unsigned char Favicon[] = {
 @SHIPMATE_FAVICON@

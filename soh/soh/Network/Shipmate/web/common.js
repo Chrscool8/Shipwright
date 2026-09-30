@@ -1,4 +1,4 @@
-// Shared by the pause menu and tracker pages. Pages show only simple statuses;
+// Shared by the pause menu and checklist pages. Pages show only simple statuses;
 // the details behind a failure go to the console.
 const el = id => document.getElementById(id);
 
