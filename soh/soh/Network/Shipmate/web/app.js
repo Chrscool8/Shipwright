@@ -436,6 +436,39 @@ if (document.fullscreenEnabled) {
         fullscreen.setAttribute('aria-pressed', String(!!document.fullscreenElement));
     };
 }
+// Page backgrounds, cycled by the toolbar button and remembered per browser.
+const backgrounds = [
+    [null, 'Plain'], ['sky-sunrise', 'Sunrise sky'], ['sky-day', 'Day sky'], ['sky-sunset', 'Sunset sky'],
+    ['sky-night', 'Night sky']
+];
+let backgroundIndex = 0;
+try {
+    backgroundIndex = Math.max(0, backgrounds.findIndex(([asset]) => asset === localStorage.getItem('shipmate-background')));
+} catch {}
+function applyBackground(revision) {
+    const [asset, label] = backgrounds[backgroundIndex];
+    el('background').title = `Background: ${label}`;
+    el('background').setAttribute('aria-label', el('background').title);
+    document.body.classList.toggle('has-background', !!asset);
+    if (!asset) {
+        document.body.style.backgroundImage = '';
+        return;
+    }
+    const url = `/assets/${asset}.png?v=${revision ?? ''}`;
+    // A light veil keeps status text readable against the brightest skies.
+    document.body.style.backgroundImage = `linear-gradient(#0003, #0003), url('${url}')`;
+    const probe = new Image();
+    probe.onerror = () => el('asset-warning').hidden = false;
+    probe.src = url;
+}
+el('background').onclick = () => {
+    backgroundIndex = (backgroundIndex + 1) % backgrounds.length;
+    try {
+        localStorage.setItem('shipmate-background', backgrounds[backgroundIndex][0] ?? '');
+    } catch {}
+    applyBackground(state?.assetRevision);
+};
+applyBackground();
 function setState(next) {
     el('status').textContent = stateStatus(next) ?? (next.canChange ? '' : 'Link is busy');
     if (next && (state?.assetRevision !== next.assetRevision || state?.language !== next.language)) {
@@ -446,6 +479,7 @@ function setState(next) {
         background(document.querySelector('.pause-panel.quest'), `/assets/quest-${language}.png?v=${revision}`);
         for (const b of document.querySelectorAll('.page-switch.left')) background(b, `/assets/gLButtonTex.png?v=${revision}`);
         for (const b of document.querySelectorAll('.page-switch.right')) background(b, `/assets/gRButtonTex.png?v=${revision}`);
+        applyBackground(revision);
     }
     state = next;
     render();

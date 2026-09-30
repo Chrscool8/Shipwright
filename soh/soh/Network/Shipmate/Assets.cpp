@@ -113,7 +113,9 @@ static std::string StripOtrSignature(const char* path) {
     return std::string(view.starts_with("__OTR__") ? view.substr(7) : view);
 }
 
-static Image LoadTexture(const std::string& path, const AssetContext& context) {
+// Indexed textures take their colors from `tlut`, an RGBA16 palette texture; indices wrap
+// to its size, as skyboxes index a second 128-color palette slot with 128-255.
+static Image LoadTexture(const std::string& path, const AssetContext& context, const std::string& tlut = {}) {
     // Exact paths avoid consulting the live alternate-assets flag on a worker.
     std::shared_ptr<Ship::IResource> loaded;
     if (context.alternate) {
@@ -137,13 +139,27 @@ static Image LoadTexture(const std::string& path, const AssetContext& context) {
     auto type = resource->Type;
     using T = Fast::TextureType;
     // HD raw textures contain RGBA pixels but retain their original N64 type.
-    // Indexed textures still require a palette and are rejected below.
+    // Indexed textures still require a palette and are rejected below without one.
     if ((resource->Flags & TEX_FLAG_LOAD_AS_IMG) ||
         ((resource->Flags & TEX_FLAG_LOAD_AS_RAW) && type != T::Palette4bpp && type != T::Palette8bpp)) {
         type = T::RGBA32bpp;
     }
+    Image palette;
+    if ((type == T::Palette4bpp || type == T::Palette8bpp) && !tlut.empty()) {
+        palette = LoadTexture(tlut, context);
+    }
+    const size_t colors = palette.rgba.size() / 4;
+    if ((type == T::Palette4bpp || type == T::Palette8bpp) && !colors) {
+        throw std::runtime_error("Indexed texture without a palette: " + path);
+    }
     int bits = 0;
     switch (type) {
+        case T::Palette8bpp:
+            bits = 8;
+            break;
+        case T::Palette4bpp:
+            bits = 4;
+            break;
         case T::RGBA32bpp:
             bits = 32;
             break;
@@ -171,6 +187,10 @@ static Image LoadTexture(const std::string& path, const AssetContext& context) {
         auto* p = &result.rgba[i * 4];
         unsigned v = bits == 4 ? (data[i / 2] >> (i % 2 ? 0 : 4)) & 15 : data[i * bits / 8];
         switch (type) {
+            case T::Palette4bpp:
+            case T::Palette8bpp:
+                std::copy_n(&palette.rgba[(v % colors) * 4], 4, p);
+                break;
             case T::RGBA32bpp:
                 std::copy_n(data + i * 4, 4, p);
                 break;
@@ -219,7 +239,47 @@ static Image Texture(const std::string& name, const AssetContext& context) {
     return path.empty() ? Image{} : LoadTexture(path, context);
 }
 
+// The four sides of a clear-sky skybox, 128x64 each, joined into one strip that wraps
+// around. Each side's last three columns are black seam padding, so they are dropped.
+static Image SkyStrip(const std::string& sides, const std::string& tlut, const AssetContext& context) {
+    std::array<Image, 4> tiles;
+    int scale = 1;
+    for (size_t i = 0; i < tiles.size(); ++i) {
+        tiles[i] = LoadTexture(sides + std::to_string(i + 1) + "Tex", context, tlut);
+        scale = std::max({ scale, (tiles[i].width + 127) / 128, (tiles[i].height + 63) / 64 });
+    }
+    // Preserve HD detail, as for pause pages.
+    if (scale > 16) {
+        throw std::runtime_error("Sky texture scale exceeds 16x");
+    }
+    constexpr int sideWidth = 125;
+    Image result{ int(tiles.size()) * sideWidth * scale, 64 * scale, {} };
+    result.rgba.resize(size_t(result.width) * result.height * 4);
+    for (int y = 0; y < result.height; ++y) {
+        for (int x = 0; x < result.width; ++x) {
+            const auto& tile = tiles[x / (sideWidth * scale)];
+            int tx = (x % (sideWidth * scale)) * tile.width / (128 * scale);
+            int ty = y * tile.height / (64 * scale);
+            std::copy_n(&tile.rgba[(size_t(ty) * tile.width + tx) * 4], 4,
+                        &result.rgba[(size_t(y) * result.width + x) * 4]);
+        }
+    }
+    return result;
+}
+
 Image ReadAsset(const std::string& name, const AssetContext& context) {
+    // Page backgrounds are "sky-<time>", from the clear-weather skyboxes.
+    static const std::unordered_map<std::string, std::pair<std::string, std::string>> skies = {
+        { "sky-sunrise", { "vr_fine0", "Sunrise" } },
+        { "sky-day", { "vr_fine1", "Day" } },
+        { "sky-sunset", { "vr_fine2", "Sunset" } },
+        { "sky-night", { "vr_fine3", "Night" } },
+    };
+    if (auto sky = skies.find(name); sky != skies.end()) {
+        const auto& [folder, skybox] = sky->second;
+        return SkyStrip("textures/" + folder + "_static/g" + skybox + "Skybox",
+                        "textures/" + folder + "_pal_static/g" + skybox + "SkyboxTLUT", context);
+    }
     // Pause pages are "items-<language>", "equipment-<language>" and "quest-<language>".
     int language, page;
     if (ParseIndexed(name, "items-", language)) {
