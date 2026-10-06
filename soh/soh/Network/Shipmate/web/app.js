@@ -400,9 +400,10 @@ function render() {
     renderQuest();
 }
 
-function setView(view) {
+function setView(view, remember = true) {
     if (!['items', 'equipment', 'quest'].includes(view)) view = 'items';
     el('panels').dataset.view = view;
+    if (!remember) return;
     try {
         localStorage.setItem('shipmate-view', view);
     } catch {}
@@ -411,15 +412,27 @@ for (const b of document.querySelectorAll('.page-switch')) {
     b.onclick = () => {
         const from = el('panels').dataset.view;
         setView(b.dataset.view);
+        // Like the background button, switching pages makes the choice the browser's own.
+        dropUrlOption('view');
         // Focus the tab that leads back to the previous page.
         document.querySelector(`#${b.dataset.view}-panel .page-switch[data-view="${from}"]`)?.focus();
     };
 }
-try {
-    setView(localStorage.getItem('shipmate-view'));
-} catch {
-    setView('items');
+// ?view=items, equipment or quest picks the starting page instead of the remembered one.
+function startingView() {
+    const view = new URLSearchParams(location.search).get('view');
+    if (['items', 'equipment', 'quest'].includes(view)) return view;
+    try {
+        return localStorage.getItem('shipmate-view');
+    } catch {
+        return 'items';
+    }
 }
+setView(startingView(), false);
+// ?toolbar=false hides the top-right buttons; ?hud=false hides the meters and button row/column,
+// leaving only the pause panel (assigning items needs the buttons, so it is unavailable).
+document.body.classList.toggle('no-toolbar', !urlFlag('toolbar'));
+document.body.classList.toggle('no-hud', !urlFlag('hud'));
 // The toolbar is pinned outside #screen, so mirror the screen's scale onto it.
 new ResizeObserver(() => {
     document.querySelector('.toolbar').style.setProperty('--u', getComputedStyle(el('screen')).getPropertyValue('--u'));
@@ -436,15 +449,19 @@ if (document.fullscreenEnabled) {
         fullscreen.setAttribute('aria-pressed', String(!!document.fullscreenElement));
     };
 }
-// Page backgrounds, cycled by the toolbar button and remembered per browser.
+// Page backgrounds, cycled by the toolbar button and remembered per browser. ?background=day
+// (the URL names below) picks the starting one instead, until the button is used.
 const backgrounds = [
-    [null, 'Plain'], ['sky-sunrise', 'Sunrise sky'], ['sky-day', 'Day sky'], ['sky-sunset', 'Sunset sky'],
-    ['sky-night', 'Night sky']
+    [null, 'Plain', 'plain'], ['sky-sunrise', 'Sunrise sky', 'sunrise'], ['sky-day', 'Day sky', 'day'],
+    ['sky-sunset', 'Sunset sky', 'sunset'], ['sky-night', 'Night sky', 'night']
 ];
-let backgroundIndex = 0;
-try {
-    backgroundIndex = Math.max(0, backgrounds.findIndex(([asset]) => asset === localStorage.getItem('shipmate-background')));
-} catch {}
+let backgroundIndex = backgrounds.findIndex(([, , name]) => name === new URLSearchParams(location.search).get('background'));
+if (backgroundIndex < 0) {
+    backgroundIndex = 0;
+    try {
+        backgroundIndex = Math.max(0, backgrounds.findIndex(([asset]) => asset === localStorage.getItem('shipmate-background')));
+    } catch {}
+}
 function applyBackground(revision) {
     const [asset, label] = backgrounds[backgroundIndex];
     el('background').title = `Background: ${label}`;
@@ -463,6 +480,8 @@ function applyBackground(revision) {
 }
 el('background').onclick = () => {
     backgroundIndex = (backgroundIndex + 1) % backgrounds.length;
+    // The choice is now the browser's own, so a reload keeps it rather than the URL's.
+    dropUrlOption('background');
     try {
         localStorage.setItem('shipmate-background', backgrounds[backgroundIndex][0] ?? '');
     } catch {}

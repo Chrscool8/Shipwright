@@ -1,5 +1,8 @@
 #pragma once
 
+#include <map>
+#include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
 #include "randomizerTypes.h"
 #include "soh/SohGui/UIWidgets.hpp"
@@ -52,7 +55,17 @@ RandomizerCheckArea GetCheckArea();
 uint16_t GetTotalChecks();
 uint16_t GetTotalChecksGotten();
 bool IsAreaSpoiled(RandomizerCheckArea rcArea);
+// Whether the area's checks may be listed: spoiled, or MQ spoilers are turned on.
+bool IsAreaRevealed(RandomizerCheckArea rcArea);
 void SetAreaSpoiled(RandomizerCheckArea rcArea);
+// Tracker data for other views, such as Shipmate; valid once a save has loaded.
+bool IsInitialized();
+const std::map<RandomizerCheckArea, std::vector<RandomizerCheck>>& GetChecksByArea();
+uint16_t GetAreaChecksGotten(RandomizerCheckArea rcArea);
+uint16_t GetAreaCheckTotal(RandomizerCheckArea rcArea);
+// The tracker's row text: the check's name, and the item or price shown beside it (empty if none).
+std::string GetCheckName(RandomizerCheck rc);
+std::string GetCheckItemText(RandomizerCheck rc);
 void UpdateInventoryChecks();
 void UpdateAreas(RandomizerCheckArea area);
 void UpdateAllOrdering();

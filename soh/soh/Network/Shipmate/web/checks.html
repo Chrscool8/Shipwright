@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shipmate Checks</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/checklist.css">
+<style>
+    /* Colors follow the check tracker's defaults. */
+    #checks { display: block; }
+    #checks[hidden] { display: none; }
+    details { border-bottom: 1px solid #354237; }
+    summary { display: flex; gap: 8px; padding: 8px 4px; cursor: pointer; font-weight: 600; }
+    summary .count { margin-left: auto; color: #9eaa97; font-weight: 400; }
+    details.complete summary { color: #9eaa97; }
+    ul { list-style: none; margin: 0 0 8px; padding: 0 4px 0 22px; }
+    li { padding: 3px 0; overflow-wrap: anywhere; }
+    li .item { margin-left: 6px; }
+    li.collected .item { color: #f26522; }
+    li.saved .item { color: #00b900; }
+    li.scummed .item { color: #00aeef; }
+    li.seen .item, li.identified .item { color: #a0a0a0; }
+    li.skipped { color: #a0a0a0; }
+</style>
+<header>
+    <div>
+        <h1>Shipmate</h1>
+        <p id="status" role="status">Connecting…</p>
+    </div>
+    <a href="/">Pause Menu</a>
+</header>
+<main id="checks" hidden></main>
+<script src="/common.js"></script>
+<script src="/checks.js"></script>
+</html>

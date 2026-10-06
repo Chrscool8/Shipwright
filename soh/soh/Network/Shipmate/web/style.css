@@ -30,11 +30,31 @@ body.has-background :is(.tool, .caption, #unassign) {
         flex-shrink: 0;
     }
 
-#status, #message {
-    text-align: center;
-    font-size: 13px;
-    margin: 8px 0;
+/* Status lines float over the top of the page in boxes, so they never move the layout. */
+#notices {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    max-width: calc(100% - 32px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
 }
+
+    #notices p {
+        margin: 0;
+        padding: 6px 14px;
+        text-align: center;
+        font-size: 13px;
+        background: #101311e6;
+        border: 1px solid #687669;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px #0008;
+    }
 
     #status:empty, #message:empty {
         display: none;
@@ -68,7 +88,7 @@ button {
         outline-offset: 3px;
     }
 /* The HUD, toolbar and pause panels scale together in --u units, fitting a
-   --w x --h screen into the space left after the status lines. The pause panel
+   --w x --h screen into the page. The pause panel
    is 720u x 533u (480u panel + 53u footer). Tall spaces put the 360u x 120u HUD
    row above it (720u x 672u, rounded up); wide spaces stack the HUD into a 130u
    column on its left (874u x 533u). The layouts trade off at 874/672 width to
@@ -79,10 +99,14 @@ button {
     initial-value: 1px;
 }
 
+/* The screen sits centered in the page's spare height. */
 #stage {
     flex: 1;
     min-height: 0;
     container: stage / size;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 #screen {
@@ -633,4 +657,16 @@ button.assignment:hover:not(:disabled) {
         width: calc(130 * var(--u));
         white-space: normal;
     }
+}
+
+/* URL options (see app.js). Without the HUD, the pause panel alone fills the screen in any shape. */
+body.no-toolbar .toolbar,
+body.no-hud :is(#meters, #buttons, #unassign) {
+    display: none;
+}
+
+body.no-hud #screen {
+    --w: 720;
+    --h: 533;
+    display: block;
 }

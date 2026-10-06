@@ -19,6 +19,54 @@ namespace SohGui {
 extern std::shared_ptr<SohMenu> mSohMenu;
 using namespace UIWidgets;
 
+#ifdef ENABLE_SHIPMATE
+// Background choices; index 0 leaves it to the browser's last pick. Values match app.js's backgrounds.
+static const std::map<int32_t, const char*> shipmateBackgrounds = {
+    { 0, "Last used" }, { 1, "Plain" }, { 2, "Sunrise sky" }, { 3, "Day sky" }, { 4, "Sunset sky" }, { 5, "Night sky" },
+};
+static const char* shipmateBackgroundValues[] = { nullptr, "plain", "sunrise", "day", "sunset", "night" };
+// Starting pause page; index 0 leaves it to the browser's last pick. Values match app.js's views.
+static const std::map<int32_t, const char*> shipmateViews = {
+    { 0, "Last used" },
+    { 1, "Select Item" },
+    { 2, "Equipment" },
+    { 3, "Quest Status" },
+};
+static const char* shipmateViewValues[] = { nullptr, "items", "equipment", "quest" };
+
+// Page options from the menu, as read by the web page.
+static std::string ShipmateUrl(const std::string& base) {
+    std::string query;
+    if (CVarGetInteger(CVAR_REMOTE("Shipmate.HideToolbar"), 0)) {
+        query += "&toolbar=false";
+    }
+    if (CVarGetInteger(CVAR_REMOTE("Shipmate.HideHud"), 0)) {
+        query += "&hud=false";
+    }
+    const int background = CVarGetInteger(CVAR_REMOTE("Shipmate.Background"), 0);
+    if (background > 0 && background < std::size(shipmateBackgroundValues)) {
+        query += std::string("&background=") + shipmateBackgroundValues[background];
+    }
+    const int view = CVarGetInteger(CVAR_REMOTE("Shipmate.View"), 0);
+    if (view > 0 && view < std::size(shipmateViewValues)) {
+        query += std::string("&view=") + shipmateViewValues[view];
+    }
+    return query.empty() ? base : base + "?" + query.substr(1);
+}
+
+static std::string ShipmateLocalUrl() {
+    return ShipmateUrl("http://127.0.0.1:" +
+                       std::to_string(CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort)) + "/");
+}
+
+static void ShipmateCopyButton(const std::string& url, const std::string& id) {
+    if (Button(("Copy URL" + id).c_str(), ButtonOptions().Size(Sizes::Inline).Color(THEME_COLOR))) {
+        ImGui::SetClipboardText(url.c_str());
+        Notification::Emit({ .message = "Copied to clipboard" });
+    }
+}
+#endif
+
 void SohMenu::AddMenuNetwork() {
     // Add Network Menu
     AddMenuEntry("Network", CVAR_SETTING("Menu.NetworkSidebarSection"));
@@ -27,6 +75,16 @@ void SohMenu::AddMenuNetwork() {
 #ifdef ENABLE_SHIPMATE
     path = { "Network", "Shipmate", SECTION_COLUMN_1 };
     AddSidebarEntry("Network", path.sidebarName, 1);
+    AddWidget(path, "About Shipmate", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path,
+              "Shipmate is a companion web page served by Ship. Open it in a browser on this PC, or on a "
+              "phone or tablet on your network, to see your pause menu while you play: items, equipment, "
+              "quest status, hearts and magic.\n"
+              "\n"
+              "You can assign items to the C-buttons and D-pad and change equipment from the page, and a "
+              "checklist page tracks what you have collected.",
+              WIDGET_TEXT);
+    AddWidget(path, "Server##Shipmate", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Enable##Shipmate", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_REMOTE("Shipmate.Enabled"))
         .Callback([](WidgetInfo&) { Shipmate::ApplySettings(); });
@@ -52,23 +110,70 @@ void SohMenu::AddMenuNetwork() {
                 Shipmate::ApplySettings();
             }
         });
-    AddWidget(path, "Connect phone##Shipmate", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {
-        if (!Shipmate::IsEnabled() || !CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0)) {
+    AddWidget(path, "##ShipmateError", WIDGET_TEXT).PreFunc([](WidgetInfo& info) {
+        info.isHidden = Shipmate::Error().empty();
+        info.name = Shipmate::Error() + "##ShipmateError";
+    });
+    // Page options and links only matter while the server runs; Port and LAN stay visible to set up beforehand.
+    const auto hideWhenOff = [](WidgetInfo& info) { info.isHidden = !Shipmate::IsEnabled(); };
+    AddWidget(path, "Page Options##Shipmate", WIDGET_SEPARATOR_TEXT).PreFunc(hideWhenOff);
+    AddWidget(path, "Hide toolbar##Shipmate", WIDGET_CVAR_CHECKBOX)
+        .PreFunc(hideWhenOff)
+        .CVar(CVAR_REMOTE("Shipmate.HideToolbar"))
+        .Options(CheckboxOptions().Tooltip(
+            "Hide the page's top-right buttons (fullscreen, background, checklist). Applies to the links and QR "
+            "code below; adds toolbar=false to the URL."));
+    AddWidget(path, "Hide HUD##Shipmate", WIDGET_CVAR_CHECKBOX)
+        .PreFunc(hideWhenOff)
+        .CVar(CVAR_REMOTE("Shipmate.HideHud"))
+        .Options(CheckboxOptions().Tooltip(
+            "Hide the hearts, magic and button bar, leaving only the pause panel. Items cannot be assigned to "
+            "buttons without it. Applies to the links and QR code below; adds hud=false to the URL."));
+    AddWidget(path, "Background##Shipmate", WIDGET_CVAR_COMBOBOX)
+        .PreFunc(hideWhenOff)
+        .CVar(CVAR_REMOTE("Shipmate.Background"))
+        .Options(ComboboxOptions()
+                     .ComboMap(shipmateBackgrounds)
+                     .Tooltip("The page's starting background. Last used keeps whatever that browser picked "
+                              "before. Clicking the page's background button switches it and drops this from "
+                              "the URL."));
+    AddWidget(path, "Starting page##Shipmate", WIDGET_CVAR_COMBOBOX)
+        .PreFunc(hideWhenOff)
+        .CVar(CVAR_REMOTE("Shipmate.View"))
+        .Options(ComboboxOptions()
+                     .ComboMap(shipmateViews)
+                     .Tooltip("The pause page the web page opens on. Last used keeps whichever page that "
+                              "browser was on. Switching pages on the page drops this from the URL."));
+    AddWidget(path, "On This PC##Shipmate", WIDGET_SEPARATOR_TEXT).PreFunc(hideWhenOff);
+    AddWidget(path, "Local link##Shipmate", WIDGET_CUSTOM).PreFunc(hideWhenOff).CustomFunction([](WidgetInfo&) {
+        const auto url = ShipmateLocalUrl();
+        ImGui::TextUnformatted(url.c_str());
+        if (Button("Open in Browser##Shipmate", ButtonOptions().Size(Sizes::Inline).Color(THEME_COLOR))) {
+            SDL_OpenURL(url.c_str());
+        }
+        ImGui::SameLine();
+        ShipmateCopyButton(url, "##ShipmateLocal");
+    });
+    AddWidget(path, "On a Phone or Tablet##Shipmate", WIDGET_SEPARATOR_TEXT).PreFunc(hideWhenOff);
+    AddWidget(path, "Phone link##Shipmate", WIDGET_CUSTOM).PreFunc(hideWhenOff).CustomFunction([](WidgetInfo&) {
+        if (!CVarGetInteger(CVAR_REMOTE("Shipmate.LAN"), 0)) {
+            ImGui::TextWrapped("Turn on Allow LAN access above to open Shipmate from another device.");
             return;
         }
-        const auto& url = Shipmate::LanUrl();
-        if (url.empty()) {
+        if (Shipmate::LanUrl().empty()) {
             ImGui::TextWrapped("No LAN address found. On your phone, open http://<PC-LAN-IP>:%d/.",
                                CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort));
             return;
         }
+        const auto url = ShipmateUrl(Shipmate::LanUrl());
         static std::string previousUrl;
-        static uint8_t qr[qrcodegen_BUFFER_LEN_FOR_VERSION(4)]{};
+        // Version 6 fits a full LAN address with every option (up to 106 bytes at medium ECC).
+        static uint8_t qr[qrcodegen_BUFFER_LEN_FOR_VERSION(6)]{};
         static bool valid = false;
         if (previousUrl != url) {
             uint8_t scratch[sizeof(qr)];
             valid =
-                qrcodegen_encodeText(url.c_str(), scratch, qr, qrcodegen_Ecc_MEDIUM, 1, 4, qrcodegen_Mask_AUTO, true);
+                qrcodegen_encodeText(url.c_str(), scratch, qr, qrcodegen_Ecc_MEDIUM, 1, 6, qrcodegen_Mask_AUTO, true);
             previousUrl = url;
         }
         ImGui::TextUnformatted("Scan with your phone on the same Wi-Fi.");
@@ -93,25 +198,7 @@ void SohMenu::AddMenuNetwork() {
             ImGui::Dummy(ImVec2(size, size));
         }
         ImGui::TextUnformatted(url.c_str());
-        if (ImGui::Button("Copy URL##ShipmateLAN")) {
-            ImGui::SetClipboardText(url.c_str());
-        }
-    });
-    AddWidget(path, "Open in Browser", WIDGET_BUTTON)
-        .PreFunc([](WidgetInfo& info) { info.options->disabled = !Shipmate::IsEnabled(); })
-        .Callback([](WidgetInfo&) {
-            auto url = "http://127.0.0.1:" +
-                       std::to_string(CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort)) + "/";
-            SDL_OpenURL(url.c_str());
-        });
-    AddWidget(path, "Shipmate URL", WIDGET_TEXT).PreFunc([](WidgetInfo& info) {
-        info.name =
-            "http://127.0.0.1:" + std::to_string(CVarGetInteger(CVAR_REMOTE("Shipmate.Port"), Shipmate::DefaultPort)) +
-            "/";
-    });
-    AddWidget(path, "##ShipmateError", WIDGET_TEXT).PreFunc([](WidgetInfo& info) {
-        info.isHidden = Shipmate::Error().empty();
-        info.name = Shipmate::Error() + "##ShipmateError";
+        ShipmateCopyButton(url, "##ShipmateLAN");
     });
 #endif
 

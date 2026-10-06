@@ -285,8 +285,11 @@ bool Enable(bool lan, int port) {
     next->Get("/checklist", Static(Web::ChecklistHtml, "text/html; charset=utf-8"));
     next->Get("/checklist.js", Static(Web::ChecklistJs, "text/javascript; charset=utf-8"));
     next->Get("/checklist.css", Static(Web::ChecklistCss, "text/css; charset=utf-8"));
+    next->Get("/checks", Static(Web::ChecksHtml, "text/html; charset=utf-8"));
+    next->Get("/checks.js", Static(Web::ChecksJs, "text/javascript; charset=utf-8"));
     next->Get("/favicon.svg", Static(Web::Favicon, "image/svg+xml"));
     next->Get("/state", [](const auto&, auto& r) { Json(r, OnGameThread(Snapshot)); });
+    next->Get("/checks/state", [](const auto&, auto& r) { Json(r, OnGameThread(Checks)); });
     next->Post("/action", [](const auto& request, auto& r) {
         auto payload = nlohmann::json::parse(request.body, nullptr, false);
         if (!request.get_header_value("Content-Type").starts_with("application/json") || !payload.is_object() ||

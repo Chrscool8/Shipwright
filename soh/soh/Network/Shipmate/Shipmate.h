@@ -20,6 +20,7 @@ const std::string& Error();
 const std::string& LanUrl();
 // Game-thread request handling and cosmetic reads.
 nlohmann::json Snapshot();
+nlohmann::json Checks();
 nlohmann::json HandleRequest(const nlohmann::json& request);
 nlohmann::json HudColors();
 std::string ItemIconPath(int item);

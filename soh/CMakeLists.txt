@@ -839,6 +839,7 @@ if(SHIPMATE_SUPPORTED)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
         "${SHIPMATE_WEB}/index.html" "${SHIPMATE_WEB}/app.js" "${SHIPMATE_WEB}/style.css"
         "${SHIPMATE_WEB}/checklist.html" "${SHIPMATE_WEB}/checklist.js" "${SHIPMATE_WEB}/checklist.css"
+        "${SHIPMATE_WEB}/checks.html" "${SHIPMATE_WEB}/checks.js"
         "${SHIPMATE_WEB}/favicon.svg" "${SHIPMATE_WEB}/common.js")
     # Embed as byte arrays: MSVC rejects string literals over ~16 KB (C2026).
     function(shipmate_embed var file)
@@ -859,6 +860,8 @@ if(SHIPMATE_SUPPORTED)
     shipmate_embed(SHIPMATE_CHECKLIST_HTML checklist.html)
     shipmate_embed(SHIPMATE_CHECKLIST_JS checklist.js)
     shipmate_embed(SHIPMATE_CHECKLIST_CSS checklist.css)
+    shipmate_embed(SHIPMATE_CHECKS_HTML checks.html)
+    shipmate_embed(SHIPMATE_CHECKS_JS checks.js)
     shipmate_embed(SHIPMATE_FAVICON favicon.svg)
     configure_file(soh/Network/Shipmate/Web.h.in ShipmateWeb.h @ONLY)
 endif()

@@ -22,6 +22,12 @@ inline constexpr unsigned char ChecklistJs[] = {
 inline constexpr unsigned char ChecklistCss[] = {
 @SHIPMATE_CHECKLIST_CSS@
 };
+inline constexpr unsigned char ChecksHtml[] = {
+@SHIPMATE_CHECKS_HTML@
+};
+inline constexpr unsigned char ChecksJs[] = {
+@SHIPMATE_CHECKS_JS@
+};
 inline constexpr unsigned char Favicon[] = {
 @SHIPMATE_FAVICON@
 };
