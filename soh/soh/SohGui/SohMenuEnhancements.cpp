@@ -9,6 +9,7 @@
 #include <soh/Enhancements/cosmetics/authenticGfxPatches.h>
 #include <soh/Enhancements/TimeDisplay/TimeDisplay.h>
 #include "soh/Enhancements/Restorations/GetItemManipulation.h"
+#include "soh/Enhancements/ExtraModes/FollowerModel.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include <ship/Context.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -164,6 +165,12 @@ static const std::map<int32_t, const char*> swordToggleModes = {
     { SWORD_TOGGLE_NONE, "None" },
     { SWORD_TOGGLE_CHILD, "Child Toggle" },
     { SWORD_TOGGLE_BOTH_AGES, "Both Ages" },
+};
+
+static const std::map<int32_t, const char*> followerFormations = {
+    { FOLLOWER_FORMATION_CONGA, "Conga Line" },
+    { FOLLOWER_FORMATION_CIRCLE, "Circle" },
+    { FOLLOWER_FORMATION_TOTEM, "Totem Pole" },
 };
 
 static const std::map<int32_t, const char*> mirroredWorldModes = {
@@ -1845,6 +1852,41 @@ void SohMenu::AddMenuEnhancements() {
     AddWidget(path, "Dogs Follow You Everywhere", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DogFollowsEverywhere"))
         .Options(CheckboxOptions().Tooltip("Allows dogs to follow you anywhere you go, even if you leave the Market."));
+    AddWidget(path, "Following Dog Doesn't Collide", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("FollowerDogNoCollision"))
+        .Options(CheckboxOptions().Tooltip("The dog following you no longer bumps into or pushes Link.\n\n"
+                                           "Takes effect the next time the dog spawns (e.g. on scene change)."));
+    AddWidget(path, "Following Dog Speed: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar(CVAR_FOLLOWER_DOG_SPEED_NAME)
+        .Options(FloatSliderOptions()
+                     .Min(FOLLOWER_DOG_SPEED_MIN)
+                     .Max(FOLLOWER_DOG_SPEED_MAX)
+                     .DefaultValue(FOLLOWER_DOG_SPEED_DEFAULT)
+                     .Format("%.2fx")
+                     .Tooltip("Makes the dog following you move faster, so it keeps up better."));
+    AddWidget(path, "Following Dog Model", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_FOLLOWER_MODEL_NAME)
+        .Options(ComboboxOptions()
+                     .DefaultIndex(0)
+                     .ComboMap(followerModelNames)
+                     .Tooltip("Swaps the model of the dog following you. It still behaves like a dog.\n\n"
+                              "Takes effect the next time the dog spawns (e.g. on scene change)."));
+    AddWidget(path, "Buddy Party Formation", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_FOLLOWER_FORMATION_NAME)
+        .Options(ComboboxOptions()
+                     .DefaultIndex(FOLLOWER_FORMATION_CONGA)
+                     .ComboMap(followerFormations)
+                     .Tooltip("How extra buddies arrange themselves: a conga line trailing your dog, a ring around "
+                              "Link, or a tower stacked on your dog. Switching moves the party right away.\n\nPick the party on Shipmate's Buddy page."));
+    AddWidget(path, "Buddy Conga Gap: %.0f", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar(CVAR_FOLLOWER_CONGA_GAP_NAME)
+        .Options(FloatSliderOptions()
+                     .Min(FOLLOWER_CONGA_GAP_MIN)
+                     .Max(FOLLOWER_CONGA_GAP_MAX)
+                     .DefaultValue(FOLLOWER_CONGA_GAP_DEFAULT)
+                     .Format("%.0f")
+                     .Tooltip("How far apart buddies space themselves in the conga line.\n\n"
+                              "Without Dogs Follow You Everywhere, long lines squeeze closer to stay in range."));
     AddWidget(path, "Rupee Dash Mode", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("RupeeDash"))
         .Options(CheckboxOptions().Tooltip("Rupees reduce over time; Link suffers damage when the count hits 0."));
