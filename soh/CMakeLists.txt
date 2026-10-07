@@ -840,6 +840,7 @@ if(SHIPMATE_SUPPORTED)
         "${SHIPMATE_WEB}/index.html" "${SHIPMATE_WEB}/app.js" "${SHIPMATE_WEB}/style.css"
         "${SHIPMATE_WEB}/checklist.html" "${SHIPMATE_WEB}/checklist.js" "${SHIPMATE_WEB}/checklist.css"
         "${SHIPMATE_WEB}/checks.html" "${SHIPMATE_WEB}/checks.js"
+        "${SHIPMATE_WEB}/buddy.html" "${SHIPMATE_WEB}/buddy.js"
         "${SHIPMATE_WEB}/favicon.svg" "${SHIPMATE_WEB}/common.js" "${SHIPMATE_WEB}/nav.css")
     # Embed as byte arrays: MSVC rejects string literals over ~16 KB (C2026).
     function(shipmate_embed var file)
@@ -863,6 +864,8 @@ if(SHIPMATE_SUPPORTED)
     shipmate_embed(SHIPMATE_CHECKLIST_CSS checklist.css)
     shipmate_embed(SHIPMATE_CHECKS_HTML checks.html)
     shipmate_embed(SHIPMATE_CHECKS_JS checks.js)
+    shipmate_embed(SHIPMATE_BUDDY_HTML buddy.html)
+    shipmate_embed(SHIPMATE_BUDDY_JS buddy.js)
     shipmate_embed(SHIPMATE_FAVICON favicon.svg)
     configure_file(soh/Network/Shipmate/Web.h.in ShipmateWeb.h @ONLY)
 endif()

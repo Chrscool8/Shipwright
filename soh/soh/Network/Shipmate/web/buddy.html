@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shipmate Buddy</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/checklist.css">
+<link rel="stylesheet" href="/nav.css">
+<style>
+    #buddy { display: block; }
+    #buddy[hidden] { display: none; }
+    #buddy p { margin: 0 0 12px; color: #9eaa97; font-size: 13px; }
+    #models { border: 0; margin: 0; padding: 0; }
+    section { margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+    label { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #354237; border-radius: 4px; background: #172018; cursor: pointer; }
+    label:hover { border-color: #748564; }
+    label:has(input:checked) { border-color: #b7cf9d; color: white; }
+    input { accent-color: #b7cf9d; margin: 0; }
+    .speed { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 10px 12px; border: 1px solid #354237; border-radius: 4px; background: #172018; cursor: default; }
+    .speed input { flex: 1; min-width: 0; }
+    .speed output { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+    .actions { display: flex; gap: 8px; margin-bottom: 12px; }
+    .actions button { flex: 1; padding: 10px 12px; border: 1px solid #748564; border-radius: 4px; background: #172018; color: #d9e8c7; font: inherit; cursor: pointer; }
+    .actions button:hover:not(:disabled), .actions button:focus-visible { color: white; border-color: #b7cf9d; }
+    .actions button:disabled { opacity: 0.45; cursor: default; }
+    button.small { padding: 4px 10px; border: 1px solid #748564; border-radius: 4px; background: #172018; color: #d9e8c7; font: inherit; font-size: 13px; cursor: pointer; }
+    button.small:hover:not(:disabled), button.small:focus-visible { color: white; border-color: #b7cf9d; }
+    button.small:disabled { opacity: 0.45; cursor: default; }
+    .party { margin-bottom: 18px; padding: 10px 12px; border: 1px solid #354237; border-radius: 4px; background: #121a14; }
+    .party-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .party-head h2 { margin: 0 auto 0 0; }
+    .formation { display: flex; gap: 6px; }
+    .formation label { padding: 4px 10px; font-size: 13px; }
+    #party { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: member; }
+    #party li { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border: 1px solid #354237; border-radius: 4px; background: #172018; font-size: 13px; counter-increment: member; }
+    #party li::before { content: counter(member); color: #9eaa97; font-variant-numeric: tabular-nums; }
+    #party li button { padding: 0 6px; border: 0; background: none; color: #9eaa97; font: inherit; font-size: 15px; cursor: pointer; }
+    #party li button:hover, #party li button:focus-visible { color: white; }
+    #party-empty { margin: 0; }
+    .grid label { justify-content: space-between; }
+    .grid label span { flex: 1; }
+    .add { padding: 0 8px; border: 1px solid #354237; border-radius: 4px; background: none; color: #9eaa97; font: inherit; cursor: pointer; }
+    .add:hover:not(:disabled), .add:focus-visible { color: white; border-color: #b7cf9d; }
+    .add:disabled { opacity: 0.35; cursor: default; }
+</style>
+<header>
+    <div>
+        <h1>Shipmate</h1>
+        <p id="status" role="status">Connecting…</p>
+    </div>
+</header>
+<main id="buddy" hidden>
+    <p>Your buddy is the dog following you. A new pick shows up the next time it spawns, such as on a scene change.</p>
+    <div class="actions">
+        <button id="summon" type="button">Summon</button>
+        <button id="dismiss" type="button">Send home</button>
+    </div>
+    <label class="speed">Speed <input id="speed" type="range" step="0.05"> <output id="speed-value" for="speed"></output></label>
+    <section class="party" aria-label="Party">
+        <div class="party-head">
+            <h2>Party <span id="party-count"></span></h2>
+            <div class="formation" role="radiogroup" aria-label="Formation">
+                <label><input type="radio" name="formation" value="0"> Conga line</label>
+                <label><input type="radio" name="formation" value="1"> Circle</label>
+                <label><input type="radio" name="formation" value="2"> Totem pole</label>
+            </div>
+            <button id="party-chaos" class="small" type="button" title="Fill the party with random buddies and bring them now">Chaos!</button>
+            <button id="party-clear" class="small" type="button">Clear</button>
+        </div>
+        <label class="speed">Conga gap <input id="gap" type="range" step="1"> <output id="gap-value" for="gap"></output></label>
+        <p id="party-empty">Add buddies with + to bring a whole party along behind your main buddy.</p>
+        <ol id="party"></ol>
+    </section>
+    <fieldset id="models" aria-label="Buddy"></fieldset>
+</main>
+<script src="/common.js"></script>
+<script src="/buddy.js"></script>
+</html>

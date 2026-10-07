@@ -288,9 +288,54 @@ bool Enable(bool lan, int port) {
     next->Get("/checklist.css", Static(Web::ChecklistCss, "text/css; charset=utf-8"));
     next->Get("/checks", Static(Web::ChecksHtml, "text/html; charset=utf-8"));
     next->Get("/checks.js", Static(Web::ChecksJs, "text/javascript; charset=utf-8"));
+    next->Get("/buddy", Static(Web::BuddyHtml, "text/html; charset=utf-8"));
+    next->Get("/buddy.js", Static(Web::BuddyJs, "text/javascript; charset=utf-8"));
     next->Get("/favicon.svg", Static(Web::Favicon, "image/svg+xml"));
     next->Get("/state", [](const auto&, auto& r) { Json(r, OnGameThread(Snapshot)); });
     next->Get("/checks/state", [](const auto&, auto& r) { Json(r, OnGameThread(Checks)); });
+    next->Get("/buddy/state", [](const auto&, auto& r) { Json(r, OnGameThread(Buddy)); });
+    next->Post("/buddy/select", [](const auto& request, auto& r) {
+        auto payload = nlohmann::json::parse(request.body, nullptr, false);
+        if (!request.get_header_value("Content-Type").starts_with("application/json") || !payload.is_object() ||
+            !payload.contains("model") || !payload["model"].is_number_integer()) {
+            r.status = 400;
+            Json(r, { { "status", "failure" }, { "message", "Expected a buddy model" } });
+            return;
+        }
+        Json(r, OnGameThread([payload] { return SetBuddy(payload); }));
+    });
+    next->Post("/buddy/speed", [](const auto& request, auto& r) {
+        auto payload = nlohmann::json::parse(request.body, nullptr, false);
+        if (!request.get_header_value("Content-Type").starts_with("application/json") || !payload.is_object() ||
+            !payload.contains("speed") || !payload["speed"].is_number()) {
+            r.status = 400;
+            Json(r, { { "status", "failure" }, { "message", "Expected a buddy speed" } });
+            return;
+        }
+        Json(r, OnGameThread([payload] { return SetBuddySpeed(payload); }));
+    });
+    next->Post("/buddy/action", [](const auto& request, auto& r) {
+        auto payload = nlohmann::json::parse(request.body, nullptr, false);
+        if (!request.get_header_value("Content-Type").starts_with("application/json") || !payload.is_object() ||
+            !payload.contains("action") || !payload["action"].is_string()) {
+            r.status = 400;
+            Json(r, { { "status", "failure" }, { "message", "Expected a buddy action" } });
+            return;
+        }
+        Json(r, OnGameThread([payload] { return BuddyAction(payload); }));
+    });
+    next->Post("/buddy/party", [](const auto& request, auto& r) {
+        auto payload = nlohmann::json::parse(request.body, nullptr, false);
+        if (!request.get_header_value("Content-Type").starts_with("application/json") || !payload.is_object() ||
+            (payload.contains("party") && !payload["party"].is_array()) ||
+            (payload.contains("formation") && !payload["formation"].is_number_integer()) ||
+            (payload.contains("gap") && !payload["gap"].is_number())) {
+            r.status = 400;
+            Json(r, { { "status", "failure" }, { "message", "Expected a buddy party" } });
+            return;
+        }
+        Json(r, OnGameThread([payload] { return SetBuddyParty(payload); }));
+    });
     next->Post("/action", [](const auto& request, auto& r) {
         auto payload = nlohmann::json::parse(request.body, nullptr, false);
         if (!request.get_header_value("Content-Type").starts_with("application/json") || !payload.is_object() ||

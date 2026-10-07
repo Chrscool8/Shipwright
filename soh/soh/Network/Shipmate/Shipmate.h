@@ -21,6 +21,11 @@ const std::string& LanUrl();
 // Game-thread request handling and cosmetic reads.
 nlohmann::json Snapshot();
 nlohmann::json Checks();
+nlohmann::json Buddy();
+nlohmann::json SetBuddy(const nlohmann::json& request);
+nlohmann::json SetBuddySpeed(const nlohmann::json& request);
+nlohmann::json BuddyAction(const nlohmann::json& request);
+nlohmann::json SetBuddyParty(const nlohmann::json& request);
 nlohmann::json HandleRequest(const nlohmann::json& request);
 nlohmann::json HudColors();
 std::string ItemIconPath(int item);

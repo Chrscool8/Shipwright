@@ -31,6 +31,12 @@ inline constexpr unsigned char ChecksHtml[] = {
 inline constexpr unsigned char ChecksJs[] = {
 @SHIPMATE_CHECKS_JS@
 };
+inline constexpr unsigned char BuddyHtml[] = {
+@SHIPMATE_BUDDY_HTML@
+};
+inline constexpr unsigned char BuddyJs[] = {
+@SHIPMATE_BUDDY_JS@
+};
 inline constexpr unsigned char Favicon[] = {
 @SHIPMATE_FAVICON@
 };

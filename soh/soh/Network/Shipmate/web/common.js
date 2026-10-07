@@ -14,6 +14,7 @@ function buildMenu() {
     const pages = [
         ['/', 'Pause Menu', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
         ['/checks', 'Checks', 'M12 21s-6-5.5-6-11a6 6 0 1 1 12 0c0 5.5-6 11-6 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5'],
+        ['/buddy', 'Buddy', 'M6 4l3.5 3h5L18 4v7a6 6 0 0 1-12 0zM10 11h.01M14 11h.01M11 14.5h2'],
         ['/checklist', 'Checklist', 'M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9']
     ];
     document.body.insertAdjacentHTML('afterbegin', `
