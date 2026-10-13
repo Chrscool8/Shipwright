@@ -240,20 +240,21 @@ static Image Texture(const std::string& name, const AssetContext& context) {
 }
 
 // The four sides of a clear-sky skybox, 128x64 each, joined into one strip that wraps
-// around. Each side's last three columns are black seam padding, so they are dropped.
+// around. The sides run 1, 4, 2, 3 around the horizon. Each side's last three columns
+// are black seam padding, and some HD packs pad the bottom row too, so both are dropped.
 static Image SkyStrip(const std::string& sides, const std::string& tlut, const AssetContext& context) {
+    constexpr std::array<int, 4> order = { 1, 4, 2, 3 };
     std::array<Image, 4> tiles;
     int scale = 1;
     for (size_t i = 0; i < tiles.size(); ++i) {
-        tiles[i] = LoadTexture(sides + std::to_string(i + 1) + "Tex", context, tlut);
+        tiles[i] = LoadTexture(sides + std::to_string(order[i]) + "Tex", context, tlut);
         scale = std::max({ scale, (tiles[i].width + 127) / 128, (tiles[i].height + 63) / 64 });
     }
-    // Preserve HD detail, as for pause pages.
-    if (scale > 16) {
-        throw std::runtime_error("Sky texture scale exceeds 16x");
-    }
-    constexpr int sideWidth = 125;
-    Image result{ int(tiles.size()) * sideWidth * scale, 64 * scale, {} };
+    // Preserve HD detail up to 16x (1008px tall, beyond any page height); larger packs,
+    // such as 4K ones at 32x, are sampled down to it rather than refused.
+    scale = std::min(scale, 16);
+    constexpr int sideWidth = 125, sideHeight = 63;
+    Image result{ int(tiles.size()) * sideWidth * scale, sideHeight * scale, {} };
     result.rgba.resize(size_t(result.width) * result.height * 4);
     for (int y = 0; y < result.height; ++y) {
         for (int x = 0; x < result.width; ++x) {
