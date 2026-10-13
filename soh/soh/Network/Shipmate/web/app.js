@@ -429,31 +429,22 @@ function startingView() {
     }
 }
 setView(startingView(), false);
-// ?toolbar=false hides the top-right buttons; ?hud=false hides the meters and button row/column,
-// leaving only the pause panel (assigning items needs the buttons, so it is unavailable).
-document.body.classList.toggle('no-toolbar', !urlFlag('toolbar'));
+// ?hud=false hides the meters and button row/column, leaving only the pause panel
+// (assigning items needs the buttons, so it is unavailable).
 document.body.classList.toggle('no-hud', !urlFlag('hud'));
 // The toolbar is pinned outside #screen, so mirror the screen's scale onto it.
 new ResizeObserver(() => {
     document.querySelector('.toolbar').style.setProperty('--u', getComputedStyle(el('screen')).getPropertyValue('--u'));
 }).observe(el('screen'));
-// Browsers without the Fullscreen API (such as iPhone Safari) keep the button hidden.
-if (document.fullscreenEnabled) {
-    const fullscreen = el('fullscreen');
-    fullscreen.hidden = false;
-    fullscreen.onclick = () => {
-        const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-        request.catch(error => console.warn('Shipmate fullscreen:', error.message));
-    };
-    document.onfullscreenchange = () => {
-        fullscreen.setAttribute('aria-pressed', String(!!document.fullscreenElement));
-    };
-}
-// Page backgrounds, cycled by the toolbar button and remembered per browser. ?background=day
-// (the URL names below) picks the starting one instead, until the button is used.
+// Page backgrounds, picked in the sidebar and remembered per browser. ?background=day
+// (the URL names below) picks the starting one instead, until the sidebar is used.
+// Swatches are each sky's top and horizon colors.
 const backgrounds = [
-    [null, 'Plain', 'plain'], ['sky-sunrise', 'Sunrise sky', 'sunrise'], ['sky-day', 'Day sky', 'day'],
-    ['sky-sunset', 'Sunset sky', 'sunset'], ['sky-night', 'Night sky', 'night']
+    [null, 'Plain', 'plain', '#101311'],
+    ['sky-sunrise', 'Sunrise', 'sunrise', 'linear-gradient(#7f6672, #d2b4a9)'],
+    ['sky-day', 'Day', 'day', 'linear-gradient(#4c7ddb, #a3caf2)'],
+    ['sky-sunset', 'Sunset', 'sunset', 'linear-gradient(#a05c60, #f1ae98)'],
+    ['sky-night', 'Night', 'night', 'linear-gradient(#01070f, #143566)']
 ];
 let backgroundIndex = backgrounds.findIndex(([, , name]) => name === new URLSearchParams(location.search).get('background'));
 if (backgroundIndex < 0) {
@@ -463,9 +454,8 @@ if (backgroundIndex < 0) {
     } catch {}
 }
 function applyBackground(revision) {
-    const [asset, label] = backgrounds[backgroundIndex];
-    el('background').title = `Background: ${label}`;
-    el('background').setAttribute('aria-label', el('background').title);
+    const [asset] = backgrounds[backgroundIndex];
+    for (const [i, choice] of backgroundChoices.entries()) choice.setAttribute('aria-pressed', String(i === backgroundIndex));
     document.body.classList.toggle('has-background', !!asset);
     if (!asset) {
         document.body.style.backgroundImage = '';
@@ -478,15 +468,28 @@ function applyBackground(revision) {
     probe.onerror = () => el('asset-warning').hidden = false;
     probe.src = url;
 }
-el('background').onclick = () => {
-    backgroundIndex = (backgroundIndex + 1) % backgrounds.length;
-    // The choice is now the browser's own, so a reload keeps it rather than the URL's.
-    dropUrlOption('background');
-    try {
-        localStorage.setItem('shipmate-background', backgrounds[backgroundIndex][0] ?? '');
-    } catch {}
-    applyBackground(state?.assetRevision);
-};
+const backgroundChoices = backgrounds.map(([asset, label, , swatch], i) => {
+    const choice = document.createElement('button');
+    choice.className = 'item';
+    choice.type = 'button';
+    choice.innerHTML = `<span class="swatch"></span>${label}`;
+    choice.firstChild.style.setProperty('--swatch', swatch);
+    choice.onclick = () => {
+        backgroundIndex = i;
+        // The choice is now the browser's own, so a reload keeps it rather than the URL's.
+        dropUrlOption('background');
+        try {
+            localStorage.setItem('shipmate-background', asset ?? '');
+        } catch {}
+        applyBackground(state?.assetRevision);
+    };
+    return choice;
+});
+menuSection('Background').append(...backgroundChoices.map(choice => {
+    const item = document.createElement('li');
+    item.append(choice);
+    return item;
+}));
 applyBackground();
 function setState(next) {
     el('status').textContent = stateStatus(next) ?? (next.canChange ? '' : 'Link is busy');

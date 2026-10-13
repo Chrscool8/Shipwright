@@ -282,6 +282,7 @@ bool Enable(bool lan, int port) {
     next->Get("/app.js", Static(Web::Js, "text/javascript; charset=utf-8"));
     next->Get("/common.js", Static(Web::CommonJs, "text/javascript; charset=utf-8"));
     next->Get("/style.css", Static(Web::Css, "text/css; charset=utf-8"));
+    next->Get("/nav.css", Static(Web::NavCss, "text/css; charset=utf-8"));
     next->Get("/checklist", Static(Web::ChecklistHtml, "text/html; charset=utf-8"));
     next->Get("/checklist.js", Static(Web::ChecklistJs, "text/javascript; charset=utf-8"));
     next->Get("/checklist.css", Static(Web::ChecklistCss, "text/css; charset=utf-8"));

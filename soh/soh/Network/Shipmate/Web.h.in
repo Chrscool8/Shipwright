@@ -13,6 +13,9 @@ inline constexpr unsigned char CommonJs[] = {
 inline constexpr unsigned char Css[] = {
 @SHIPMATE_CSS@
 };
+inline constexpr unsigned char NavCss[] = {
+@SHIPMATE_NAV_CSS@
+};
 inline constexpr unsigned char ChecklistHtml[] = {
 @SHIPMATE_CHECKLIST_HTML@
 };

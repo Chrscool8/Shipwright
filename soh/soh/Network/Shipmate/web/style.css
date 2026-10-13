@@ -252,54 +252,6 @@ button.assignment:hover:not(:disabled) {
     filter: brightness(1.2);
 }
 
-/* Pinned to the window's top-right corner, free to overlap the HUD row's empty
-   right side on narrow windows. It sits outside #screen, so app.js copies --u to it. */
-.toolbar {
-    position: fixed;
-    top: 12px;
-    right: 14px;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    gap: calc(6 * var(--u));
-}
-
-.tool {
-    width: calc(34 * var(--u));
-    height: calc(34 * var(--u));
-    padding: 0;
-    display: grid;
-    place-items: center;
-    color: #d9e8c7;
-    border: 1px solid #748564;
-    border-radius: calc(4 * var(--u));
-    background: #172018e6;
-}
-
-    .tool:hover, .tool:focus-visible {
-        color: white;
-        border-color: #b7cf9d;
-    }
-
-    .tool:focus-visible {
-        outline: 2px solid #fff2a9;
-        outline-offset: 3px;
-    }
-
-    .tool svg {
-        width: 53%;
-        height: 53%;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-    }
-
-    .tool[aria-pressed="true"] .enter, .tool[aria-pressed="false"] .exit {
-        display: none;
-    }
-
 .ammo, .hud-ammo {
     position: absolute;
     right: 0;
@@ -659,8 +611,7 @@ button.assignment:hover:not(:disabled) {
     }
 }
 
-/* URL options (see app.js). Without the HUD, the pause panel alone fills the screen in any shape. */
-body.no-toolbar .toolbar,
+/* URL options (see app.js; ?toolbar=false is in nav.css). Without the HUD, the pause panel alone fills the screen in any shape. */
 body.no-hud :is(#meters, #buttons, #unassign) {
     display: none;
 }

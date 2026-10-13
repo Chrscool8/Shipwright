@@ -1,0 +1,206 @@
+/* The corner buttons and sidebar shared by every Shipmate page (built by common.js). */
+
+/* Pinned to the window's top-right corner, free to overlap the HUD row's empty right side
+   on narrow windows. On the pause menu app.js copies the screen's --u scale onto it;
+   other pages use plain pixels. */
+.toolbar {
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: calc(6 * var(--u, 1px));
+}
+
+.tool {
+    width: calc(34 * var(--u, 1px));
+    height: calc(34 * var(--u, 1px));
+    padding: 0;
+    display: grid;
+    place-items: center;
+    color: #d9e8c7;
+    border: 1px solid #748564;
+    border-radius: calc(4 * var(--u, 1px));
+    background: #172018e6;
+    cursor: pointer;
+}
+
+    .tool:hover, .tool:focus-visible {
+        color: white;
+        border-color: #b7cf9d;
+    }
+
+    .tool:focus-visible {
+        outline: 2px solid #fff2a9;
+        outline-offset: 3px;
+    }
+
+    .tool svg, .sidebar svg {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .tool svg {
+        width: 53%;
+        height: 53%;
+    }
+
+    .tool[aria-pressed="true"] .enter, .tool[aria-pressed="false"] .exit {
+        display: none;
+    }
+
+/* A modal sheet from the right edge, over the page rather than beside it, since the
+   pause menu scales to fill the window. */
+.sidebar {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(300px, 100vw - 48px);
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    color: #eef4e9;
+    font: 15px system-ui, sans-serif;
+    border: 0;
+    border-left: 1px solid #354237;
+    background: #0d120f;
+    box-shadow: -8px 0 24px #0008;
+    transition: transform .18s ease-out;
+}
+
+    .sidebar:not([open]) {
+        display: none;
+    }
+
+    @starting-style {
+        .sidebar[open] {
+            transform: translateX(100%);
+        }
+    }
+
+    .sidebar::backdrop {
+        background: #0008;
+    }
+
+    .sidebar header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 0;
+        padding: 12px 14px 12px 18px;
+        border-bottom: 1px solid #354237;
+    }
+
+    .sidebar h2 {
+        margin: 0;
+        color: #eef4e9;
+        font-size: 18px;
+    }
+
+    .sidebar h3 {
+        margin: 0;
+        padding: 16px 18px 6px;
+        color: #9eaa97;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .sidebar ul {
+        margin: 0;
+        padding: 0 8px;
+        list-style: none;
+    }
+
+    .sidebar .close {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        color: #9eaa97;
+        border: 0;
+        border-radius: 4px;
+        background: none;
+        cursor: pointer;
+    }
+
+        .sidebar .close svg {
+            width: 20px;
+            height: 20px;
+        }
+
+    .sidebar .item {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        color: #d9e8c7;
+        font: inherit;
+        text-align: left;
+        text-decoration: none;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        background: none;
+        cursor: pointer;
+    }
+
+        .sidebar .item svg {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+        }
+
+    .sidebar :is(.item, .close):hover {
+        color: white;
+        background: #172018;
+    }
+
+    .sidebar :is(.item, .close):focus-visible {
+        color: white;
+        outline: 2px solid #fff2a9;
+        outline-offset: -2px;
+    }
+
+    .sidebar .item:is([aria-current="page"], [aria-pressed="true"]) {
+        color: white;
+        border-color: #748564;
+        background: #172018;
+    }
+
+    /* Background choices show a swatch of their sky, so picking one needs no image download. */
+    .sidebar .swatch {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        border: 1px solid #748564;
+        border-radius: 50%;
+        background: var(--swatch);
+    }
+
+    .sidebar .item[aria-pressed="true"]::after {
+        content: "✓";
+        margin-left: auto;
+        color: #b7cf9d;
+    }
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar {
+        transition: none;
+    }
+}
+
+/* ?toolbar=false (see common.js). */
+body.no-toolbar .toolbar {
+    display: none;
+}

@@ -1,4 +1,4 @@
-// Shared by the pause menu and checklist pages. Pages show only simple statuses;
+// Shared by every Shipmate page. Pages show only simple statuses;
 // the details behind a failure go to the console.
 const el = id => document.getElementById(id);
 
@@ -6,6 +6,61 @@ const el = id => document.getElementById(id);
 function urlFlag(name, fallback = true) {
     const value = new URLSearchParams(location.search).get(name);
     return value === 'true' ? true : value === 'false' ? false : fallback;
+}
+
+// The corner buttons and the sidebar of pages (styled by nav.css). ?toolbar=false hides the corner.
+function buildMenu() {
+    const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}" /></svg>`;
+    const pages = [
+        ['/', 'Pause Menu', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
+        ['/checks', 'Checks', 'M12 21s-6-5.5-6-11a6 6 0 1 1 12 0c0 5.5-6 11-6 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5'],
+        ['/checklist', 'Checklist', 'M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9']
+    ];
+    document.body.insertAdjacentHTML('afterbegin', `
+    <nav class="toolbar" aria-label="Shipmate">
+        <button id="menu" class="tool" type="button" aria-haspopup="dialog" aria-label="Menu" title="Menu">${icon('M4 6h16M4 12h16M4 18h16')}</button>
+        <button id="fullscreen" class="tool" type="button" aria-pressed="false" aria-label="Fullscreen" title="Fullscreen" hidden>
+            <svg class="enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>
+            <svg class="exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M15 20v-5h5M9 20v-5H4" /></svg>
+        </button>
+    </nav>
+    <dialog id="sidebar" class="sidebar" aria-label="Shipmate menu">
+        <header><h2>Shipmate</h2><button class="close" type="button" aria-label="Close menu" title="Close">${icon('M6 6l12 12M18 6L6 18')}</button></header>
+        <h3>Pages</h3>
+        <ul>${pages.map(([href, label, path]) => `<li><a class="item" href="${href}"${href === location.pathname ? ' aria-current="page"' : ''}>${icon(path)}${label}</a></li>`).join('')}</ul>
+    </dialog>`);
+    document.body.classList.toggle('no-toolbar', !urlFlag('toolbar'));
+    const sidebar = el('sidebar');
+    el('menu').onclick = () => sidebar.showModal();
+    sidebar.querySelector('.close').onclick = () => sidebar.close();
+    // Clicks on the backdrop land on the dialog itself, outside its box.
+    sidebar.addEventListener('click', ({ target, clientX: x, clientY: y }) => {
+        const box = sidebar.getBoundingClientRect();
+        if (target === sidebar && (x < box.left || x > box.right || y < box.top || y > box.bottom)) sidebar.close();
+    });
+}
+buildMenu();
+
+// Browsers without the Fullscreen API (such as iPhone Safari) keep the button hidden.
+if (document.fullscreenEnabled) {
+    const fullscreen = el('fullscreen');
+    fullscreen.hidden = false;
+    fullscreen.onclick = () => {
+        const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+        request.catch(error => console.warn('Shipmate fullscreen:', error.message));
+    };
+    document.addEventListener('fullscreenchange', () => {
+        fullscreen.setAttribute('aria-pressed', String(!!document.fullscreenElement));
+    });
+}
+
+// Adds a titled group of buttons to the sidebar, below the pages, returning its list.
+function menuSection(title) {
+    const list = document.createElement('ul');
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+    el('sidebar').append(heading, list);
+    return list;
 }
 
 // Carry URL options across Shipmate's own pages.
