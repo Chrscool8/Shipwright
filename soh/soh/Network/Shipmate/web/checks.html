@@ -9,19 +9,30 @@
 <style>
     /* Colors follow the check tracker's defaults. */
     #checks { display: block; }
-    #checks[hidden] { display: none; }
+    #checks[hidden], #check-tools[hidden] { display: none; }
     details { border-bottom: 1px solid #354237; }
     summary { display: flex; gap: 8px; padding: 8px 4px; cursor: pointer; font-weight: 600; }
     summary .count { margin-left: auto; color: #9eaa97; font-weight: 400; }
     details.complete summary { color: #9eaa97; }
-    ul { list-style: none; margin: 0 0 8px; padding: 0 4px 0 22px; }
-    li { padding: 3px 0; overflow-wrap: anywhere; }
+    ul { list-style: none; margin: 0 0 8px; padding: 0 4px; }
+    li { display: grid; grid-template-columns: 1.5em 1fr; padding: 3px 0; overflow-wrap: anywhere; }
     li .item { margin-left: 6px; }
-    li.collected .item { color: #f26522; }
-    li.saved .item { color: #00b900; }
-    li.scummed .item { color: #00aeef; }
-    li.seen .item, li.identified .item { color: #a0a0a0; }
-    li.skipped { color: #a0a0a0; }
+    /* A mark column, as the tracker window keeps a button column only for rows still to do. */
+    .mark { text-align: center; font-weight: 700; }
+    .collected { --status: #f26522; }
+    .saved { --status: #00b900; }
+    .scummed { --status: #00aeef; }
+    :is(.seen, .identified, .skipped) { --status: #a0a0a0; }
+    :is(.mark, .item) { color: var(--status); }
+    /* Finished rows step back so what is left stands out. */
+    li:is(.collected, .saved, .skipped) .name { color: #8d978a; }
+    li.skipped .name { text-decoration: line-through; }
+    #check-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-bottom: 12px; color: #9eaa97; font-size: 13px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; }
+    .legend li { display: flex; gap: 5px; padding: 0; }
+    .hide-done { display: flex; align-items: center; gap: 6px; margin-left: auto; color: #d9e8c7; cursor: pointer; }
+    .hide-done input { margin: 0; accent-color: #b7cf9d; }
+    #checks.hide-done :is(li.collected, li.saved, li.skipped, details.complete) { display: none; }
 </style>
 <header>
     <div>
@@ -29,6 +40,16 @@
         <p id="status" role="status">Connecting…</p>
     </div>
 </header>
+<div id="check-tools" hidden>
+    <ul class="legend" aria-label="Legend">
+        <li class="collected"><span class="mark">✓</span>Collected</li>
+        <li class="saved"><span class="mark">✓</span>Saved</li>
+        <li class="seen"><span class="mark">•</span>Seen</li>
+        <li class="scummed"><span class="mark">•</span>Scummed</li>
+        <li class="skipped"><span class="mark">–</span>Skipped</li>
+    </ul>
+    <label class="hide-done"><input id="hide-done" type="checkbox">Hide done</label>
+</div>
 <main id="checks" hidden></main>
 <script src="/common.js"></script>
 <script src="/checks.js"></script>

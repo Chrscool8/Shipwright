@@ -8,6 +8,9 @@ function rowState(check) {
     return check.skipped ? 'skipped' : check.status;
 }
 
+// The mark column's symbol per row state; unchecked rows leave it blank.
+const marks = { collected: '✓', saved: '✓', seen: '•', identified: '•', scummed: '•', skipped: '–' };
+
 function area(entry) {
     const details = document.createElement('details');
     const summary = document.createElement('summary');
@@ -30,14 +33,26 @@ function area(entry) {
     const list = document.createElement('ul');
     for (const check of entry.checks) {
         const row = document.createElement('li');
-        row.className = rowState(check);
-        row.textContent = check.name;
+        const state = rowState(check);
+        row.className = state;
+        const mark = document.createElement('span');
+        mark.className = 'mark';
+        mark.textContent = marks[state] ?? '';
+        if (mark.textContent) {
+            mark.title = state[0].toUpperCase() + state.slice(1);
+            mark.setAttribute('role', 'img');
+            mark.setAttribute('aria-label', mark.title);
+        }
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = check.name;
         if (check.item) {
             const item = document.createElement('span');
             item.className = 'item';
             item.textContent = `(${check.item})`;
-            row.append(item);
+            name.append(item);
         }
+        row.append(mark, name);
         list.append(row);
     }
     details.append(list);
@@ -52,7 +67,22 @@ watchState({
         el('status').textContent = stateStatus(state) ?? `${state.gotten} Checked / ${state.total} Total`;
         // Keep the last list visible while disconnected.
         if (!state) return;
-        el('checks').hidden = !state.loaded;
+        el('checks').hidden = el('check-tools').hidden = !state.loaded;
         el('checks').replaceChildren(...(state.loaded ? state.areas.map(area) : []));
     }
 });
+
+// "Hide done" hides finished rows and complete areas, remembered per browser.
+function setHideDone(hide) {
+    el('hide-done').checked = hide;
+    el('checks').classList.toggle('hide-done', hide);
+}
+try {
+    setHideDone(localStorage.getItem('shipmate-hide-done') === 'true');
+} catch {}
+el('hide-done').onchange = () => {
+    setHideDone(el('hide-done').checked);
+    try {
+        localStorage.setItem('shipmate-hide-done', String(el('hide-done').checked));
+    } catch {}
+};
