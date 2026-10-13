@@ -3,6 +3,7 @@
 #include "soh/Enhancements/randomizer/randomizer_check_objects.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "soh/Enhancements/randomizer/randomizer_check_tracker.h"
+#include "soh/Enhancements/randomizer/static_data.h"
 #include "soh/OTRGlobals.h"
 
 extern "C" {
@@ -25,6 +26,19 @@ const char* StatusName(RandomizerCheckStatus status) {
         default:
             return "unchecked";
     }
+}
+
+// The tracker names a vanilla save's item only for heart pieces, since a check's name usually implies
+// it. The page names every item once it is obtained, as a rando save does.
+std::string ItemText(RandomizerCheck rc, Rando::ItemLocation* itemLoc) {
+    auto txt = CheckTracker::GetCheckItemText(rc);
+    const auto status = itemLoc->GetCheckStatus();
+    if (txt.empty() && !IS_RANDO &&
+        (status == RCSHOW_COLLECTED || status == RCSHOW_SAVED || status == RCSHOW_SCUMMED)) {
+        const auto vanillaItem = Rando::StaticData::GetLocation(rc)->GetVanillaItem();
+        txt = Rando::StaticData::RetrieveItem(vanillaItem).GetName().GetForLanguage(gSaveContext.language);
+    }
+    return txt;
 }
 } // namespace
 
@@ -59,7 +73,7 @@ nlohmann::json Shipmate::Checks() {
                     }
                     auto* itemLoc = OTRGlobals::Instance->gRandoContext->GetItemLocation(rc);
                     entry["checks"].push_back({ { "name", CheckTracker::GetCheckName(rc) },
-                                                { "item", CheckTracker::GetCheckItemText(rc) },
+                                                { "item", ItemText(rc, itemLoc) },
                                                 { "status", StatusName(itemLoc->GetCheckStatus()) },
                                                 { "skipped", itemLoc->GetIsSkipped() } });
                 }
