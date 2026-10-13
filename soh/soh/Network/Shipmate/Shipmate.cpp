@@ -260,7 +260,12 @@ bool Enable(bool lan, int port) {
             origin.empty() || origin == expectedOrigin || (port == 80 && origin == expectedOrigin + suffix);
         in_addr numericAddress{};
         bool knownHost = address == "localhost" || inet_pton(AF_INET, address.c_str(), &numericAddress) == 1;
-        if (!knownHost || !sameOrigin || request.get_header_value("Sec-Fetch-Site") == "cross-site") {
+        // A page opened by a link on another site, or reloaded after one, is a cross-site (or "null"
+        // origin) navigation. Those stay allowed: GET routes only read, and pages refuse framing.
+        const bool navigation = (request.method == "GET" || request.method == "HEAD") &&
+                                request.get_header_value("Sec-Fetch-Mode") == "navigate";
+        const bool crossSite = !sameOrigin || request.get_header_value("Sec-Fetch-Site") == "cross-site";
+        if (!knownHost || (crossSite && !navigation)) {
             response.status = 403;
             Json(response, { { "status", "failure" }, { "message", "Unrecognized browser origin" } });
             return httplib::Server::HandlerResponse::Handled;
