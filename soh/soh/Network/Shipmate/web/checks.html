@@ -7,26 +7,26 @@
 <link rel="stylesheet" href="/checklist.css">
 <link rel="stylesheet" href="/nav.css">
 <style>
-    /* Colors follow the check tracker's defaults. */
+    /* Colors follow the check tracker's defaults. Rules stay inside the list and its tools, clear of the sidebar. */
     #checks { display: block; }
     #checks[hidden], #check-tools[hidden] { display: none; }
-    details { border-bottom: 1px solid #354237; }
-    summary { display: flex; gap: 8px; padding: 8px 4px; cursor: pointer; font-weight: 600; }
-    summary .count { margin-left: auto; color: #9eaa97; font-weight: 400; }
-    details.complete summary { color: #9eaa97; }
-    ul { list-style: none; margin: 0 0 8px; padding: 0 4px; }
-    li { display: grid; grid-template-columns: 1.5em 1fr; padding: 3px 0; overflow-wrap: anywhere; }
-    li .item { margin-left: 6px; }
+    #checks details { border-bottom: 1px solid #354237; }
+    #checks summary { display: flex; gap: 8px; padding: 8px 4px; cursor: pointer; font-weight: 600; }
+    #checks summary .count { margin-left: auto; color: #9eaa97; font-weight: 400; }
+    #checks details.complete summary { color: #9eaa97; }
+    #checks ul { list-style: none; margin: 0 0 8px; padding: 0 4px; }
+    #checks li { display: grid; grid-template-columns: 1.5em 1fr; padding: 3px 0; overflow-wrap: anywhere; }
+    #checks .item { margin-left: 6px; }
     /* A mark column, as the tracker window keeps a button column only for rows still to do. */
     .mark { text-align: center; font-weight: 700; }
     .collected { --status: #f26522; }
     .saved { --status: #00b900; }
     .scummed { --status: #00aeef; }
     :is(.seen, .identified, .skipped) { --status: #a0a0a0; }
-    :is(.mark, .item) { color: var(--status); }
+    :is(#checks, #check-tools) :is(.mark, .item) { color: var(--status); }
     /* Finished rows step back so what is left stands out. */
-    li:is(.collected, .saved, .skipped) .name { color: #8d978a; }
-    li.skipped .name { text-decoration: line-through; }
+    #checks li:is(.collected, .saved, .skipped) .name { color: #8d978a; }
+    #checks li.skipped .name { text-decoration: line-through; }
     #check-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-bottom: 12px; color: #9eaa97; font-size: 13px; }
     .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; }
     .legend li { display: flex; gap: 5px; padding: 0; }
