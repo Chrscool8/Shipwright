@@ -64,7 +64,8 @@ watchState({
     // The full check list is larger than /state, and checks change rarely.
     interval: 1000,
     onChange(state) {
-        el('status').textContent = stateStatus(state) ?? `${state.gotten} Checked / ${state.total} Total`;
+        el('status').textContent = state?.bossRush ? 'The check tracker is not available in Boss Rush.'
+                                                   : stateStatus(state) ?? `${state.gotten} Checked / ${state.total} Total`;
         // Keep the last list visible while disconnected.
         if (!state) return;
         el('checks').hidden = el('check-tools').hidden = !state.loaded;

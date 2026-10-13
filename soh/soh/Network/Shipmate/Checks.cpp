@@ -5,6 +5,10 @@
 #include "soh/Enhancements/randomizer/randomizer_check_tracker.h"
 #include "soh/OTRGlobals.h"
 
+extern "C" {
+#include "variables.h"
+}
+
 namespace {
 const char* StatusName(RandomizerCheckStatus status) {
     switch (status) {
@@ -28,6 +32,10 @@ const char* StatusName(RandomizerCheckStatus status) {
 nlohmann::json Shipmate::Checks() {
     bool loaded = GameInteractor::IsSaveLoaded() && CheckTracker::IsInitialized();
     nlohmann::json state = { { "loaded", loaded } };
+    // The tracker never starts for Boss Rush, so such a save loads without any checks.
+    if (!loaded && GameInteractor::IsSaveLoaded() && IS_BOSS_RUSH) {
+        state["bossRush"] = true;
+    }
     if (loaded) {
         state["total"] = CheckTracker::GetTotalChecks();
         state["gotten"] = CheckTracker::GetTotalChecksGotten();
